@@ -520,3 +520,20 @@ grid-template-columns: 1fr;
 white-space: normal;
 }
 }
+
+/* Timeline bars */
+.timeline-svg {
+display: block;
+width: 100%;
+cursor: pointer;
+}
+.legend-sun-partial::before {
+content: "";
+display: inline-block;
+width: 9px;
+height: 9px;
+margin-right: 6px;
+border-radius: 50%;
+vertical-align: middle;
+background: rgba(242, 184, 75, 0.35);
+}

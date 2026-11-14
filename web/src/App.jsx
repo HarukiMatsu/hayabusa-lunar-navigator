@@ -1,8 +1,9 @@
 import {useEffect, useState} from 'react'
 import './App.css'
 import visibilityUrl from '../data/visibility.json?url'
-import {missionRange, summarise} from './model.js'
+import {missionRange, series, summarise} from './model.js'
 import SkyView from './SkyView.jsx'
+import Timeline from './Timeline.jsx'
 
 function formatPct(share) {
 return `${(100 * share).toFixed(1)}%`
@@ -282,35 +283,26 @@ setTimeOffset(i - range.from)
 <section className="timeline">
 <div className="section-heading">
 <h2>Mission Timeline</h2>
-<span className="verdict-status">Mission Overview</span>
+<span className="verdict-status">{missionDuration} {missionDuration === 1 ? 'day' : 'days'}, hourly</span>
 </div>
-<div className="timeline-events">
-<div className="timeline-event">
-<div className="timeline-marker sunrise"></div>
-<div className="timeline-details">
-<h3>Sunrise</h3>
-<p>Sunlight reaches landing site</p>
-<span>Day 1 : 06:00</span>
-</div>
-</div>
-<div className="timeline-event">
-<div className="timeline-marker sunset"></div>
-<div className="timeline-details">
-<h3>Sunset</h3>
-<p>Landing site enters darkness</p>
-<span>Day 1 : 18:00</span>
-</div>
-</div>
-<div className="timeline-event">
-<div className="timeline-marker sunrise"></div>
-<div className="timeline-details">
-<h3>Sunrise</h3>
-<p>Sunlight returns to landing site</p>
-<span>Day 2 : 06:00</span>
-</div>
-</div>
-
-
+{site && range ? (
+<Timeline
+sunVis={series(site, 'sun', mastHeight)}
+earthVis={series(site, 'earth', mastHeight)}
+range={range}
+index={timeIndex}
+stepHours={data.meta.step_hours}
+onIndexChange={(i) => {
+setPlaying(false)
+setTimeOffset(i - range.from)
+}}
+/>
+) : null}
+<div className="sky-legend">
+<span className="legend-sun">Sun at least half in view</span>
+<span className="legend-sun-partial">Sun partly in view</span>
+<span className="legend-earth">Earth at least half in view</span>
+<span>Click a bar to jump to that hour</span>
 </div>
 </section>
 
