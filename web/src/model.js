@@ -15,8 +15,9 @@ export const SOLAR_CONSTANT = 1361; // sunlight power at the Moon's distance fro
 export const UP = 0.5;              // a body counts as "up" when at least half its disc is visible
 
 export const DEFAULT_REQUIREMENTS = {
+  minSunShare: 0.7,     // average visible fraction of the Sun over the mission (solar energy)
   maxDarkHours: 48,     // longest stretch without sunlight the lander can survive
-  minEarthShare: 0.3,   // fraction of the mission that needs Earth in view
+  minEarthShare: 0.5,   // fraction of the mission that needs Earth in view
   maxSlopeDeg: 10,      // steepest ground the lander can land on
   minTempK: 233,        // coldest the equipment may get (-40 C)
   maxTempK: 333,        // hottest the equipment may get (+60 C)
@@ -159,11 +160,16 @@ export function thermalSummary(site, range, req = DEFAULT_REQUIREMENTS, lander =
 
 // ---- pass or fail ----
 
-/** Tests one site and mission against the requirements. Every check is reported separately. */
+/**
+ * Tests one site and mission against the requirements. Every check is reported separately.
+ * Cold is not a pass/fail check: thermal.hoursBeforeTooCold and thermal.heaterEnergyWh are
+ * reported instead, because they depend on the lander's heater and battery.
+ */
 export function checkMission(site, range, req = DEFAULT_REQUIREMENTS, lander = DEFAULT_LANDER, stepHours = 1, mast = '') {
   const s = summarise(site, range, stepHours, mast);
   const t = thermalSummary(site, range, req, lander, stepHours, mast);
   const checks = {
+    sunlight: s.sunShare >= req.minSunShare,
     power: s.longestDarkHours <= req.maxDarkHours,
     comms: s.earthShare >= req.minEarthShare,
     slope: site.slope_deg <= req.maxSlopeDeg,
