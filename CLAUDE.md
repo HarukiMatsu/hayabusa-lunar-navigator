@@ -92,10 +92,17 @@ $$f_\odot = \frac12 + \frac{x\sqrt{1-x^2} + \arcsin x}{\pi}$$
 | Time to sunset / Earthset | from the chosen time to the next switch to not lit / not visible |
 | Solar elevation | Sun elevation at the chosen time |
 
-**Verdict** (our demo defaults, adjustable, labelled on screen as not NASA requirements):
-- **Viable:** sunlit ≥ 70%, longest darkness ≤ 48 h, Earth visible ≥ 50%
-- **Marginal:** power passes and comms fails, or the reverse
-- **No go:** sunlit < 50% or longest darkness > 96 h
+**Verdict** (agreed 14 Nov). `web/src/model.js` is the single definition: `checkMission()` with `DEFAULT_REQUIREMENTS`. These are our demo defaults, editable in the app and labelled on screen as not NASA requirements. The mission passes only if every check passes; each check is shown separately.
+
+| Check | Passes when | Default |
+|---|---|---|
+| `sunlight` | sunlit share (mean $f_\odot$) $\ge$ `minSunShare` | 0.70 |
+| `power` | longest darkness $\le$ `maxDarkHours` | 48 h |
+| `comms` | Earth visible share $\ge$ `minEarthShare` | 0.50 |
+| `slope` | `slope_deg` $\le$ `maxSlopeDeg` | 10° |
+| `notTooHot` | hottest Sun-facing lander temperature $\le$ `maxTempK` | 333 K |
+
+Cold is not pass/fail. `thermalSummary()` reports `hoursBeforeTooCold` (unheated time from the hottest point down to `minTempK`, default 233 K) and `heaterEnergyWh` (heater energy needed through the longest darkness). The lander values in `DEFAULT_LANDER` are placeholders, and the app says so. The old Viable / Marginal / No go labels are dropped.
 
 ---
 

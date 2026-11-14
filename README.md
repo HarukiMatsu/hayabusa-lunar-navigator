@@ -15,7 +15,7 @@ For each site, hourly through 2027:
 
 Sites: Site01 (connecting ridge), Site04 (Shackleton rim), Site11 (de Gerlache rim) and Site23 (Malapert massif). Site01, Site04 and Site11 also have extra candidate points at regions 2 and 3 of Barker et al. (2021).
 
-The Python pipeline writes everything to one file, `web/data/visibility.json`, which the web app reads. The data format is described in section 5 of `CLAUDE.md`.
+The Python pipeline writes everything to one file, `web/data/visibility.json`, which the web app reads. The sky view draws the Sun and Earth at their mean angular sizes (radius 0.27 and 0.95 degrees); Earth's real size varies by about 7% with its distance. The data format is described in section 5 of `CLAUDE.md`.
 
 ## Results are checked
 
