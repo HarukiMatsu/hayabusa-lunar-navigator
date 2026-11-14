@@ -14,6 +14,15 @@
 
 - Mazarico, E., Neumann, G. A., Smith, D. E., Zuber, M. T., Torrence, M. H. (2011). Illumination conditions of the lunar polar regions using LOLA topography. *Icarus* 211, 1066 to 1081. doi:10.1016/j.icarus.2010.10.030
 
+## Thermal model constants
+
+- Albedo 0.12 and emissivity 0.95: Vasavada, A. R. et al. (2012). Lunar equatorial surface temperatures and regolith properties from the Diviner Lunar Radiometer Experiment. *Journal of Geophysical Research* 117, E00H18. doi:10.1029/2011JE003987. Same values in Hayne, P. O. et al. (2017). Global regolith thermophysical properties of the Moon from the Diviner Lunar Radiometer Experiment. *Journal of Geophysical Research: Planets* 122, 2371 to 2400. doi:10.1002/2017JE005387
+- Equatorial noon (about 387 to 390 K) and pre-dawn (about 95 K) surface temperatures, used to check the model and to set the cooling rate: Vasavada et al. (2012), above.
+- Night floor from lunar heat flow (21 and 16 mW/m2 at the Apollo 15 and 17 sites): Langseth, M. G., Keihm, S. J., Peters, K. (1976). Revised lunar heat-flow values. *Proceedings of the 7th Lunar Science Conference*, 3143 to 3171.
+- Coldest observed polar shadow temperatures (about 25 K): Paige, D. A. et al. (2010). Diviner Lunar Radiometer observations of cold traps in the Moon's south polar region. *Science* 330, 479 to 483. doi:10.1126/science.1187726
+- Solar constant 1361 W/m2: Kopp, G., Lean, J. L. (2011). A new, lower value of total solar irradiance: Evidence and climate significance. *Geophysical Research Letters* 38, L01706. doi:10.1029/2010GL045777
+- Stefan-Boltzmann constant: CODATA 2018 recommended values (Tiesinga, E. et al. (2021), *Reviews of Modern Physics* 93, 025010).
+
 ## Software
 
 - Acton, C. H. (1996). Ancillary data services of NASA's Navigation and Ancillary Information Facility. *Planetary and Space Science* 44, 65 to 70. (SPICE)

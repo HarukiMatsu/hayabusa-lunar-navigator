@@ -289,6 +289,69 @@ def check_farfield(site_xy=(-11582.5, -12462.5), year_start="2027-01-01T00:00:00
     return hor, src
 
 
+def check_barker():
+    """Site01 RoI 1 over Barker et al. (2021)'s period with Barker's definitions:
+    average illumination = mean visible fraction; LCSP = longest run with no
+    Sun at all (f = 0); LCIP = longest run with any Sun (f > 0).
+    Barker Table 2 values are clone percentiles: row A averages the RoI
+    (cautious), row C takes the best pixel each hour (optimistic)."""
+    from pipeline import horizon as hz
+    from pipeline import visibility as vis
+    from pipeline.build import far_tiers
+    from pipeline.terrain import site_dem
+
+    dem = site_dem("Site01")
+    x, y = -11582.5, -12462.5
+    lat, lon = dem.latlon(x, y)
+    n = (np.datetime64("2026-01-01") - np.datetime64("2024-01-01")).astype(int) * 24
+    ets = eph.hourly_ets("2024-01-01T00:00:00Z", n)
+    barker = {1.0: {"A": (68.03, 16.55, 63.35), "C": (85.84, 10.46, 205.38)},
+              5.0: {"A": (89.26, 5.29, 215.79), "C": (91.83, 3.7, 232.50)}}
+    rows = {}
+    for name, far in (("ours, tile only", []), ("ours, 3 tiers", far_tiers())):
+        ground, hor = hz.site_horizon(dem, x, y, (1.0, 5.0), far)
+        sky = eph.site_sky(lat, lon, ground + 1.0, ets)
+        for m in (1.0, 5.0):
+            f = vis.disc_fraction(hor[m], sky["sun_az"], sky["sun_el"], sky["sun_rad"])
+            rows[(name, m)] = (100 * f.mean(), vis.longest_run(f <= 0) / 24, vis.longest_run(f > 0) / 24)
+    print("Site01 RoI 1, 2024-01-01 to 2026-01-01, hourly, Barker's definitions\n")
+    print(f"{'mast':5} {'source':34} {'avg illum %':>11} {'LCSP d':>8} {'LCIP d':>8}")
+    for m in (1.0, 5.0):
+        for name in ("ours, tile only", "ours, 3 tiers"):
+            r = rows[(name, m)]
+            print(f"{m:3.0f} m {name:34} {r[0]:11.1f} {r[1]:8.2f} {r[2]:8.1f}")
+        for case, label in (("A", "Barker A (RoI average, cautious)"), ("C", "Barker C (best pixel, optimistic)")):
+            b = barker[m][case]
+            print(f"{'':5} {label:34} {b[0]:11.1f} {b[1]:8.2f} {b[2]:8.1f}")
+        print()
+
+
+def check_thermal():
+    """Thermal model sanity checks against known lunar temperatures."""
+    from pipeline import thermal as th
+
+    print(f"Constants: albedo {th.ALBEDO}, emissivity {th.EMISSIVITY}, S {th.S_1AU} W/m^2, "
+          f"heat flow {th.HEAT_FLOW * 1000:.0f} mW/m^2")
+    print(f"Night floor T_floor = {th.T_FLOOR:.1f} K; slab heat capacity C = {th.HEAT_CAP:.3g} J/m^2/K\n")
+    noon = th.t_equilibrium(1.0, th.cos_incidence(0.0, 90.0, 0.0, 0.0))
+    print(f"Flat ground, Sun overhead (equator at noon): {float(noon):.1f} K   (Diviner: about 387 to 390 K)")
+    for start in (390.0, 250.0, 150.0):
+        T = start
+        for _ in range(int(th.NIGHT_S / 3600)):
+            T = th.cool(T, 3600.0)
+        print(f"Cooling for one equatorial night (14.77 d) from {start:.0f} K: {T:.1f} K   (Diviner pre-dawn: about 95 K)")
+    T, days = 200.0, {}
+    for h in range(1, 200 * 24 + 1):
+        T = th.cool(T, 3600.0)
+        if h % (24 * 50) == 0 or h in (24, 24 * 10):
+            days[h // 24] = T
+    print("Polar shadow, starting at 200 K: " + ", ".join(f"{d} d {t:.0f} K" for d, t in days.items()))
+    for el, slope, face in ((1.5, 0, 0), (1.5, 5, 180), (1.5, 5, 0), (1.5, 20, 180)):
+        ci = th.cos_incidence(180.0, el, slope, face)
+        print(f"Sun at az 180, el {el} deg; slope {slope:2d} deg facing {face:3d}: "
+              f"cos i {float(ci):.3f}, T_eq {float(th.t_equilibrium(1.0, ci)):.0f} K")
+
+
 CHECKS = {
     "horizons": check_horizons,
     "horizon-synthetic": check_horizon_synthetic,
@@ -297,6 +360,8 @@ CHECKS = {
     "slope": check_slope,
     "practice": check_practice,
     "farfield": check_farfield,
+    "barker": check_barker,
+    "thermal": check_thermal,
 }
 
 if __name__ == "__main__":

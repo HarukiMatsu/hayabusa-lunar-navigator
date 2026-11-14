@@ -11,6 +11,7 @@ import numpy as np
 
 from pipeline import ephemeris as eph
 from pipeline import horizon as hz
+from pipeline import thermal
 from pipeline import visibility as vis
 from pipeline.terrain import mosaic_dem, polar_dem, site_dem
 
@@ -91,7 +92,8 @@ def build_site(site, ets, sun_km, earth_km):
         "sun_az": az2(sky["sun_az"]), "sun_el": r2(sky["sun_el"]),
         "earth_az": az2(sky["earth_az"]), "earth_el": r2(sky["earth_el"]),
         "horizon": r2(hor[1.0]), "horizon_5m": r2(hor[5.0]),
-        "ground_temp_k": [None] * len(ets),  # filled in step 6 (thermal.py)
+        "ground_temp_k": r2(thermal.ground_temperature(
+            frac[1.0][0], sky["sun_az"], sky["sun_el"], slope, facing, STEP_HOURS)),
     }
     stats = {m: vis.summary(*frac[m], STEP_HOURS) for m in MASTS}
     for m in MASTS:
