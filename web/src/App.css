@@ -436,3 +436,87 @@ opacity: 0.7;
 max-width: 230px;
 line-height: 1.3;
 }
+
+/* Sky view (SVG panorama, controls and true-scale close-ups) */
+.sky-svg {
+display: block;
+width: 100%;
+height: 100%;
+}
+.sky-axis {
+fill: #91a9c7;
+font-size: 10px;
+}
+.sky-controls {
+display: flex;
+align-items: center;
+gap: 10px;
+margin-top: 12px;
+}
+.sky-controls input[type="range"] {
+flex: 1;
+min-width: 0;
+}
+.play-button {
+padding: 6px 14px;
+background: #3478c9;
+color: #ffffff;
+border: none;
+border-radius: 6px;
+font-size: 13px;
+font-weight: 600;
+cursor: pointer;
+}
+.play-button:hover {
+background: #438be0;
+}
+.sky-time {
+color: #91a9c7;
+font-size: 12px;
+white-space: nowrap;
+}
+.sky-closeups {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 12px;
+margin-top: 12px;
+}
+.sky-closeup {
+margin: 0;
+}
+.sky-closeup svg {
+display: block;
+width: 100%;
+border: 1px solid #293d56;
+border-radius: 6px;
+}
+.sky-closeup figcaption {
+margin-top: 6px;
+color: #91a9c7;
+font-size: 11px;
+line-height: 1.4;
+}
+.legend-sun::before,
+.legend-earth::before {
+content: "";
+display: inline-block;
+width: 9px;
+height: 9px;
+margin-right: 6px;
+border-radius: 50%;
+vertical-align: middle;
+}
+.legend-sun::before {
+background: #f2b84b;
+}
+.legend-earth::before {
+background: #4ea3ff;
+}
+@media (max-width: 600px) {
+.sky-closeups {
+grid-template-columns: 1fr;
+}
+.sky-time {
+white-space: normal;
+}
+}

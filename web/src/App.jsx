@@ -2,6 +2,7 @@ import {useEffect, useState} from 'react'
 import './App.css'
 import visibilityUrl from '../data/visibility.json?url'
 import {missionRange, summarise} from './model.js'
+import SkyView from './SkyView.jsx'
 
 function formatPct(share) {
 return `${(100 * share).toFixed(1)}%`
@@ -62,6 +63,36 @@ const landingMs = data
 const landingIso = data ? new Date(landingMs).toISOString() : ''
 const range = data ? missionRange(data.meta, landingIso, missionDuration) : null
 const summary = site && range ? summarise(site, range, data.meta.step_hours, mastHeight) : null
+
+// Selected moment within the mission, as hours after landing. Shared by the
+// sky view, timeline and countdown. Play steps one hour every 60 ms.
+const [timeOffset, setTimeOffset] = useState(0)
+const [playing, setPlaying] = useState(false)
+const windowHours = range ? range.to - range.from : 0
+const offset = Math.min(Math.max(timeOffset, 0), Math.max(windowHours - 1, 0))
+const timeIndex = range ? range.from + offset : 0
+const timeLabel = data
+? `${new Date(dataStartMs + timeIndex * data.meta.step_hours * HOUR_MS).toISOString().slice(0, 16).replace('T', ' ')} UTC, day ${Math.floor(offset / 24) + 1} hour ${offset % 24}`
+: ''
+
+useEffect(() => {
+if (!playing) return undefined
+const timer = setInterval(() => {
+setTimeOffset((t) => {
+if (t + 1 >= windowHours) {
+setPlaying(false)
+return t
+}
+return t + 1
+})
+}, 60)
+return () => clearInterval(timer)
+}, [playing, windowHours])
+
+const togglePlay = () => {
+if (!playing && offset >= windowHours - 1) setTimeOffset(0)
+setPlaying(!playing)
+}
 
 const handleCompare = () => {
 console.log("Comparing mission settings:", {
@@ -218,19 +249,31 @@ Compare to evaluate the conditions
 <section className="sky-view">
 <div className="section-heading">
 <h2>Sky View</h2>
-<span className="verdict-status">Simulated View</span>
+<span className="verdict-status">Terrain horizon, {mastHeight === '5m' ? '5 m' : '1 m'} mast</span>
 </div>
-<div className="sky-display">
-<div className="sky-object sun"> </div>
-<div className="sky-object earth"> </div>
-<div className="horizon"></div>
-<div className="lunar-ground"></div>
-</div>
+{site && range ? (
+<SkyView
+site={site}
+mast={mastHeight}
+range={range}
+index={timeIndex}
+timeLabel={timeLabel}
+playing={playing}
+onTogglePlay={togglePlay}
+onIndexChange={(i) => {
+setPlaying(false)
+setTimeOffset(i - range.from)
+}}
+/>
+) : (
+<div className="sky-display" />
+)}
 
 <div className="sky-legend">
-<span>Sun</span>
-    <span>Earth</span>
-    <span>— Lunar horizon</span>
+<span className="legend-sun">Sun and its path</span>
+<span className="legend-earth">Earth and its path</span>
+<span>Line: terrain horizon from LOLA elevation maps</span>
+<span>Close-ups are at true angular size</span>
 </div>
 
 
