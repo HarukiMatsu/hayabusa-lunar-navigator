@@ -1,371 +1,470 @@
-"""Validation checks. Run from the project root:
+"""Validation. Run from the project root:
 
-    .venv\\Scripts\\python -m pipeline.validate horizons
+    .venv\\Scripts\\python -m pipeline.validate            all checks: table + plots
+    .venv\\Scripts\\python -m pipeline.validate <check>    one check, printed
+
+Outputs go to docs/validation/: summary.md (one table) and one plot per check.
+Checks: ephemeris, synthetic, barker, farfield, thermal (in the report), plus
+disc, slope and nearfield (printed only).
 """
 import sys
+import time
+from pathlib import Path
 
 import numpy as np
 import spiceypy as spice
 
 from pipeline import ephemeris as eph
+from pipeline import horizon as hz
+from pipeline import thermal as th
+from pipeline import visibility as vis
+from pipeline.terrain import Dem, DEM_DIR, site_dem
 
-# Site01 high point (CLAUDE.md section 12), 1 m mast
-SITE01_HIGH = {"lat": -89.4389, "lon": -137.1436, "ground_m": 1959.5}
+ROOT = Path(__file__).resolve().parents[1]
+OUT = ROOT / "docs" / "validation"
+
+SITE01_HIGH = {"lat": -89.4389, "lon": -137.1436, "ground_m": 1959.5}   # step 1 point
+SITE01_ROI1 = (-11582.5, -12462.5)                                      # map metres
+BARKER_PERIOD = ("2024-01-01T00:00:00Z", 2 * 365 * 24 + 24)            # 2024 is a leap year
+# Barker et al. (2021) Table 2, Site 1 RoI 1: (avg illumination %, LCSP d, LCIP d)
+BARKER = {1.0: {"A": (68.03, 16.55, 63.35), "C": (85.84, 10.46, 205.38)},
+          5.0: {"A": (89.26, 5.29, 215.79), "C": (91.83, 3.70, 232.50)}}
+
+# Chart colours (light theme, categorical slots in fixed order)
+C1, C2, C3 = "#2a78d6", "#eb6834", "#1baf7a"
+INK, INK2, GRID, BG = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 
 
 def wrap180(d):
     return (np.asarray(d) + 180.0) % 360.0 - 180.0
 
 
-def check_horizons(start="2027-01-01T00:00:00Z", days=60):
-    """Compare our Sun and Earth az/el with SPICE azlcpo and with JPL Horizons."""
-    from astroquery.jplhorizons import Horizons
+def _fig(nrows=1, ncols=1, w=10, h=4):
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    fig, axes = plt.subplots(nrows, ncols, figsize=(w, h), dpi=150, squeeze=False)
+    fig.patch.set_facecolor(BG)
+    for ax in axes.ravel():
+        ax.set_facecolor(BG)
+        ax.grid(color=GRID, lw=0.6)
+        ax.tick_params(colors=INK2, labelsize=8)
+        for side in ("top", "right"):
+            ax.spines[side].set_visible(False)
+        for side in ("left", "bottom"):
+            ax.spines[side].set_color(INK2)
+    return fig, axes
 
+
+def _save(fig, name):
+    OUT.mkdir(parents=True, exist_ok=True)
+    fig.tight_layout()
+    fig.savefig(OUT / name)
+    return f"docs/validation/{name}"
+
+
+# ---------------------------------------------------------------- ephemeris
+def run_ephemeris(start="2027-01-01T00:00:00Z", days=60):
+    """Our Sun/Earth az/el vs SPICE azlcpo and JPL Horizons, Site01 high point."""
     s = SITE01_HIGH
     h_m = s["ground_m"] + 1.0
     n = days * 24
     ets = eph.hourly_ets(start, n)
     sky = eph.site_sky(s["lat"], s["lon"], h_m, ets)
-
-    # 1. SPICE's own topocentric routine, same kernels, independent code path
-    site_km = spice.latrec(eph.MOON_R_KM + h_m / 1000.0,
-                           np.radians(s["lon"]), np.radians(s["lat"]))
-    spice_ref = {}
+    site_km = spice.latrec(eph.MOON_R_KM + h_m / 1000.0, np.radians(s["lon"]), np.radians(s["lat"]))
+    res = {"n": n, "start": start, "sky": sky}
     for key, tgt in (("sun", "SUN"), ("earth", "EARTH")):
-        az = np.empty(n)
-        el = np.empty(n)
+        az, el = np.empty(n), np.empty(n)
         for i, et in enumerate(ets):
-            st, _ = spice.azlcpo("ELLIPSOID", tgt, et, "LT+S", False, True,
-                                 site_km, "MOON", "MOON_ME")
+            st, _ = spice.azlcpo("ELLIPSOID", tgt, et, "LT+S", False, True, site_km, "MOON", "MOON_ME")
             az[i], el[i] = np.degrees(st[1]), np.degrees(st[2])
-        spice_ref[key] = (az, el)
+        res[("azlcpo", key)] = (wrap180(sky[key + "_az"] - az), sky[key + "_el"] - el)
+    try:
+        from astroquery.jplhorizons import Horizons
+        stop = np.datetime64(start.replace("Z", "")) + np.timedelta64(days, "D")
+        loc = {"lon": s["lon"], "lat": s["lat"], "elevation": h_m / 1000.0, "body": 301}
+        for key, tgt in (("sun", "10"), ("earth", "399")):
+            tab = Horizons(id=tgt, location=loc,
+                           epochs={"start": start[:16].replace("T", " "),
+                                   "stop": str(stop)[:16].replace("T", " "), "step": "1h"}
+                           ).ephemerides(quantities="4")
+            az = np.asarray(tab["AZ"], float)[:n]
+            el = np.asarray(tab["EL"], float)[:n]
+            res[("horizons", key)] = (wrap180(sky[key + "_az"] - az), sky[key + "_el"] - el)
+    except Exception as e:  # network down: report, do not crash
+        res["horizons_error"] = str(e)
+    return res
 
-    # 2. JPL Horizons, independent ephemeris (DE440/441) and software
-    stop = np.datetime64(start.replace("Z", "")) + np.timedelta64(days, "D")
-    loc = {"lon": s["lon"], "lat": s["lat"], "elevation": h_m / 1000.0, "body": 301}
-    hz = {}
-    for key, tgt in (("sun", "10"), ("earth", "399")):
-        tab = Horizons(id=tgt, location=loc,
-                       epochs={"start": start[:16].replace("T", " "),
-                               "stop": str(stop)[:16].replace("T", " "),
-                               "step": "1h"}).ephemerides(quantities="4")
-        hz[key] = (np.asarray(tab["AZ"], float)[:n], np.asarray(tab["EL"], float)[:n])
 
-    print(f"Site01 high point, lat {s['lat']}, lon {s['lon']}, "
-          f"height {h_m} m, {n} hourly samples from {start}\n")
+def print_ephemeris(r):
+    print(f"Site01 high point, {r['n']} hourly samples from {r['start']}")
     print(f"{'body':6} {'reference':10} {'max |d az| deg':>15} {'max |d el| deg':>15}")
     for key in ("sun", "earth"):
-        for name, ref in (("azlcpo", spice_ref[key]), ("Horizons", hz[key])):
-            daz = np.max(np.abs(wrap180(sky[key + "_az"] - ref[0])))
-            dele = np.max(np.abs(sky[key + "_el"] - ref[1]))
-            print(f"{key:6} {name:10} {daz:15.6f} {dele:15.6f}")
-    print()
-    for key in ("sun", "earth"):
-        print(f"{key}: el {sky[key+'_el'].min():.2f} to {sky[key+'_el'].max():.2f} deg, "
-              f"az {sky[key+'_az'].min():.1f} to {sky[key+'_az'].max():.1f} deg, "
-              f"angular radius {sky[key+'_rad'].min():.3f} to {sky[key+'_rad'].max():.3f} deg")
+        for ref in ("azlcpo", "horizons"):
+            if (ref, key) in r:
+                daz, dele = r[(ref, key)]
+                print(f"{key:6} {ref:10} {np.abs(daz).max():15.6f} {np.abs(dele).max():15.6f}")
+    if "horizons_error" in r:
+        print("Horizons query failed:", r["horizons_error"])
 
 
-def check_horizon_synthetic():
-    """Flat ground with two blocks of known size; compare with hand values."""
+def plot_ephemeris(r):
+    if ("horizons", "sun") not in r:
+        return None
+    fig, axes = _fig(1, 2, 10, 3.6)
+    days = np.arange(r["n"]) / 24
+    for ax, key, title in ((axes[0, 0], "sun", "Sun"), (axes[0, 1], "earth", "Earth")):
+        daz, dele = r[("horizons", key)]
+        ax.plot(days, dele * 3600, color=C1, lw=1.5, label="elevation")
+        ax.plot(days, daz * 3600, color=C2, lw=1.5, label="azimuth")
+        ax.axhline(0, color=INK2, lw=0.8)
+        ax.set_title(f"{title}: ours minus JPL Horizons", loc="left", fontsize=10, color=INK)
+        ax.set_xlabel("Days from 1 Jan 2027", fontsize=9, color=INK2)
+        ax.set_ylabel("Difference, arcseconds", fontsize=9, color=INK2)
+        ax.legend(frameon=False, fontsize=8, loc="upper right", ncol=2)
+    rad = 0.27 * 3600
+    fig.suptitle(f"Ephemeris check, Site01 high point (for scale, the Sun's radius is {rad:.0f} arcseconds)",
+                 x=0.01, ha="left", fontsize=10, color=INK2)
+    return _save(fig, "ephemeris_vs_horizons.png")
+
+
+# ---------------------------------------------------------------- synthetic horizon
+def run_synthetic():
+    """Flat ground with two blocks of known size, compared with the hand formula."""
     from pyproj import CRS
-    from pipeline import horizon as hz
-    from pipeline.terrain import Dem
-
     crs = CRS.from_proj4("+proj=stere +lat_0=-90 +lon_0=0 +R=1737400 +units=m")
-    res, half = 5.0, 1000                       # 2001 x 2001 px, 10 km square
+    res, half = 5.0, 1000
     probe = Dem(np.zeros((1, 1)), 0, 0, 1, crs.to_wkt())
-    xc, yc = probe.xy(-89.0, 0.0)               # x = 0, y about 30 km
+    xc, yc = probe.xy(-89.0, 0.0)
     xs = xc + (np.arange(2 * half + 1) - half) * res
     ys = yc - (np.arange(2 * half + 1) - half) * res
     X, Y = np.meshgrid(xs - xc, ys - yc)
     z = np.zeros_like(X)
-    z[(Y >= 2000) & (Y <= 2200) & (np.abs(X) <= 500)] = 100.0   # block 2 km north, 100 m tall
-    z[(X >= 3000) & (X <= 3100) & (np.abs(Y) <= 300)] = 50.0    # block 3 km east, 50 m tall
+    z[(Y >= 2000) & (Y <= 2200) & (np.abs(X) <= 500)] = 100.0   # 100 m block, 2 km north
+    z[(X >= 3000) & (X <= 3100) & (np.abs(Y) <= 300)] = 50.0    # 50 m block, 3 km east
     dem = Dem(z, xs[0] - res / 2, ys[0] + res / 2, res, crs.to_wkt())
-
-    mast = 1.0
+    mast, R = 1.0, 1737400.0
     _, out = hz.site_horizon(dem, xc, yc, masts_m=(mast,))
-    h = out[mast]
-    R = 1737400.0
 
-    def hand(height, d):  # CLAUDE.md section 2 formula
+    def hand(height, d):
         return np.degrees(np.arctan((height - mast - d ** 2 / (2 * R)) / d))
 
-    rows = [("north block (az 0)", 0.0, hand(100, 2000)),
-            ("east block (az 90)", 90.0, hand(50, 3000)),
-            ("flat ground (az 45)", 45.0, hz.sphere_dip_deg(mast)),
-            ("flat ground (az 225)", 225.0, hz.sphere_dip_deg(mast))]
-    print("Synthetic DEM: flat ground, 1 m mast, observer at 89 S 0 E\n")
+    rows = [("north block", 0.0, hand(100, 2000)), ("east block", 90.0, hand(50, 3000)),
+            ("flat ground", 45.0, hz.sphere_dip_deg(mast)), ("flat ground", 225.0, hz.sphere_dip_deg(mast))]
+    rows = [(nm, az, exp, out[mast][int(round(az / hz.AZ_STEP))]) for nm, az, exp in rows]
+    return {"horizon": out[mast], "rows": rows}
+
+
+def print_synthetic(r):
+    print("Synthetic map: flat ground, 1 m mast, observer at 89 S 0 E")
     print(f"{'direction':22} {'expected deg':>13} {'computed deg':>13} {'diff deg':>10}")
-    for name, az, exp in rows:
-        got = h[int(round(az / hz.AZ_STEP))]
-        print(f"{name:22} {exp:13.5f} {got:13.5f} {got - exp:10.5f}")
+    for nm, az, exp, got in r["rows"]:
+        print(f"{nm + f' (az {az:.0f})':22} {exp:13.5f} {got:13.5f} {got - exp:10.5f}")
 
 
-def check_horizon_site01(plot=True):
-    """Near field horizon at the Site01 high point, 1 m and 5 m masts."""
-    import time
-    from pipeline import horizon as hz
-    from pipeline.terrain import site_dem
+def plot_synthetic(r):
+    fig, axes = _fig(1, 1, 10, 3.6)
+    ax = axes[0, 0]
+    ax.plot(hz.AZ, r["horizon"], color=C1, lw=2, label="computed horizon")
+    for i, (nm, az, exp, got) in enumerate(r["rows"]):
+        ax.plot(az, exp, "o", ms=9, mfc="none", mec=C2, mew=2, label="hand calculation" if i == 0 else None)
+        ax.annotate(f"{nm}\n{exp:.3f} deg", (az, exp), xytext=(10, -26 if exp > 2 else 8),
+                    textcoords="offset points", fontsize=8, color=INK2)
+    ax.set_xlim(0, 360)
+    ax.set_xticks(range(0, 361, 45))
+    ax.set_xlabel("Azimuth, degrees clockwise from north", fontsize=9, color=INK2)
+    ax.set_ylabel("Horizon elevation, degrees", fontsize=9, color=INK2)
+    ax.set_title("Synthetic map check: 100 m block 2 km north, 50 m block 3 km east, 1 m mast",
+                 loc="left", fontsize=10, color=INK)
+    ax.set_ylim(-0.3, 3.3)
+    ax.legend(frameon=False, fontsize=8, loc="upper center")
+    return _save(fig, "horizon_synthetic.png")
 
-    s = SITE01_HIGH
+
+# ---------------------------------------------------------------- Barker bracket
+def _sun_metrics(f):
+    return 100 * f.mean(), vis.longest_run(f <= 0) / 24, vis.longest_run(f > 0) / 24
+
+
+def run_barker():
+    """Site01 RoI 1 over Barker's period with Barker's definitions:
+    average illumination = mean visible fraction, LCSP = longest run with no
+    Sun at all, LCIP = longest run with any Sun. Barker Table 2 values are
+    clone percentiles: row A averages the RoI (cautious), row C takes the
+    best pixel each hour (optimistic). A single point should fall between."""
+    from pipeline.build import far_tiers
     dem = site_dem("Site01")
-    x, y = dem.xy(s["lat"], s["lon"])
-    t = time.perf_counter()
-    ground, out = hz.site_horizon(dem, x, y, masts_m=(1.0, 5.0))
-    dt = time.perf_counter() - t
-    print(f"Site01 high point: map x {x:.1f} m, y {y:.1f} m, ground {ground:.1f} m "
-          f"(listed 1959.5 m); 720 rays, 5 m steps, {dt:.2f} s\n")
-    print(f"{'mast':>5} {'min':>7} {'max':>7} {'mean':>7} {'az of max':>10} "
-          f"{'sphere dip':>11} {'% below dip':>12} {'no data':>8}")
-    for mast, h in out.items():
-        dip = hz.sphere_dip_deg(ground + mast)
-        print(f"{mast:4.0f}m {h.min():7.2f} {h.max():7.2f} {h.mean():7.2f} "
-              f"{hz.AZ[np.argmax(h)]:10.1f} {dip:11.2f} "
-              f"{100 * np.mean(h < dip):11.1f}% {np.sum(h == hz.NO_TERRAIN):8d}")
-
-    if plot:
-        import matplotlib
-        matplotlib.use("Agg")
-        import matplotlib.pyplot as plt
-        from pathlib import Path
-        out_png = Path(__file__).resolve().parents[1] / "docs" / "validation" / "horizon_site01_nearfield.png"
-        out_png.parent.mkdir(parents=True, exist_ok=True)
-        fig, ax = plt.subplots(figsize=(10, 4), dpi=150)
-        fig.patch.set_facecolor("#fcfcfb")
-        ax.set_facecolor("#fcfcfb")
-        ax.axvspan(129, 145, color="#c3c2b7", alpha=0.35, lw=0)
-        ax.text(137, 1.3, "Earth directions", ha="center", fontsize=8, color="#52514e")
-        ax.axhspan(-1.6, 1.6, color="#eda100", alpha=0.08, lw=0)
-        ax.text(2, 1.3, "Sun elevation range", fontsize=8, color="#52514e")
-        ax.axhline(hz.sphere_dip_deg(ground + 1), color="#52514e", lw=1, ls="--")
-        ax.text(214, hz.sphere_dip_deg(ground + 1) - 0.2, "smooth sphere edge", ha="center",
-                fontsize=8, color="#52514e")
-        ax.plot(hz.AZ, out[1.0], color="#2a78d6", lw=2, label="1 m mast")
-        ax.plot(hz.AZ, out[5.0], color="#eb6834", lw=2, label="5 m mast")
-        ax.set_xlim(0, 360)
-        ax.set_xticks(range(0, 361, 45))
-        ax.set_xlabel("Azimuth, degrees clockwise from north")
-        ax.set_ylabel("Horizon elevation, degrees")
-        ax.set_title("Site01 high point, terrain horizon from the 16 km site map only",
-                     loc="left", fontsize=11)
-        ax.grid(color="#e4e3df", lw=0.6)
-        for side in ("top", "right"):
-            ax.spines[side].set_visible(False)
-        ax.legend(frameon=False, loc="upper right", ncol=2)
-        fig.tight_layout()
-        fig.savefig(out_png)
-        print(f"\nplot: {out_png.relative_to(out_png.parents[2])}")
+    x, y = SITE01_ROI1
+    lat, lon = dem.latlon(x, y)
+    ets = eph.hourly_ets(*BARKER_PERIOD)
+    res = {}
+    for name, far in (("tile only", []), ("3 tiers", far_tiers())):
+        ground, hor = hz.site_horizon(dem, x, y, (1.0, 5.0), far)
+        sky = eph.site_sky(lat, lon, ground + 1.0, ets)
+        for m in (1.0, 5.0):
+            res[(name, m)] = _sun_metrics(
+                vis.disc_fraction(hor[m], sky["sun_az"], sky["sun_el"], sky["sun_rad"]))
+    return res
 
 
+def barker_within(r, m, k):
+    a, c = BARKER[m]["A"][k], BARKER[m]["C"][k]
+    return min(a, c) <= r[("3 tiers", m)][k] <= max(a, c)
+
+
+def print_barker(r):
+    print("Site01 RoI 1, 2024-01-01 to 2026-01-01, Barker's definitions")
+    print(f"{'mast':5} {'source':34} {'avg illum %':>11} {'LCSP d':>8} {'LCIP d':>8}")
+    for m in (1.0, 5.0):
+        for name in ("tile only", "3 tiers"):
+            v = r[(name, m)]
+            print(f"{m:3.0f} m {'ours, ' + name:34} {v[0]:11.1f} {v[1]:8.2f} {v[2]:8.1f}")
+        for case, label in (("A", "Barker A (RoI average, cautious)"), ("C", "Barker C (best pixel, optimistic)")):
+            b = BARKER[m][case]
+            print(f"{'':5} {label:34} {b[0]:11.1f} {b[1]:8.2f} {b[2]:8.1f}")
+
+
+def plot_barker(r):
+    fig, axes = _fig(1, 3, 10, 3.2)
+    labels = ("Average illumination, %", "Longest shadow (LCSP), days", "Longest lit (LCIP), days")
+    for k, ax in enumerate(axes[0]):
+        for row, m in enumerate((1.0, 5.0)):
+            a, c = BARKER[m]["A"][k], BARKER[m]["C"][k]
+            ax.plot([a, c], [row, row], color=INK2, lw=5, alpha=0.25, solid_capstyle="round",
+                    label="Barker range, A to C" if (k, row) == (0, 0) else None)
+            ax.plot(r[("tile only", m)][k], row, "o", ms=8, mfc=BG, mec=INK2, mew=1.5,
+                    label="ours, site map only" if (k, row) == (0, 0) else None)
+            ax.plot(r[("3 tiers", m)][k], row, "o", ms=8, color=C1,
+                    label="ours, with far field" if (k, row) == (0, 0) else None)
+        ax.set_yticks([0, 1])
+        ax.set_yticklabels(["1 m mast", "5 m mast"])
+        ax.set_ylim(-0.6, 1.6)
+        ax.set_title(labels[k], loc="left", fontsize=9, color=INK)
+    fig.legend(*axes[0, 0].get_legend_handles_labels(), frameon=False, fontsize=8,
+               loc="lower center", ncol=3, bbox_to_anchor=(0.5, -0.02))
+    fig.suptitle("Site01 RoI 1, 2024 to 2025: our single point against Barker et al. (2021) Table 2",
+                 x=0.01, ha="left", fontsize=10, color=INK)
+    fig.tight_layout(rect=(0, 0.08, 1, 1))
+    OUT.mkdir(parents=True, exist_ok=True)
+    fig.savefig(OUT / "barker_bracket_site01.png")
+    return "docs/validation/barker_bracket_site01.png"
+
+
+# ---------------------------------------------------------------- far field
+def run_farfield(start="2027-01-01T00:00:00Z", n=8760):
+    from pipeline.build import far_tiers
+    dem = site_dem("Site01")
+    x, y = SITE01_ROI1
+    lat, lon = dem.latlon(x, y)
+    full = far_tiers()
+    cases = {"site map only": ([], ["tile"]),
+             "+ mosaic": (full[:1], ["tile", "mosaic"]),
+             "+ mosaic + 240 m map": (full, ["tile", "mosaic", "polar"])}
+    ets = eph.hourly_ets(start, n)
+    res = {"cases": cases, "hor": {}, "src": {}, "stats": {}}
+    sky = None
+    for name, (far, _) in cases.items():
+        ground, h, s = hz.site_horizon(dem, x, y, (1.0, 5.0), far, with_source=True)
+        if sky is None:
+            sky = eph.site_sky(lat, lon, ground + 1.0, ets)
+        res["hor"][name], res["src"][name] = h, s
+        for m in (1.0, 5.0):
+            res["stats"][(name, m)] = vis.summary(
+                vis.disc_fraction(h[m], sky["sun_az"], sky["sun_el"], sky["sun_rad"]),
+                vis.disc_fraction(h[m], sky["earth_az"], sky["earth_el"], sky["earth_rad"]))
+    res["earth_az"] = (sky["earth_az"].min(), sky["earth_az"].max())
+    return res
+
+
+def print_farfield(r):
+    print("Site01 RoI 1, 2027")
+    print(f"{'case':22} {'mast':>4} {'sunlit %':>9} {'dark d':>7} {'Earth %':>8} {'both %':>7}  azimuths set by")
+    for name, (_, labels) in r["cases"].items():
+        for m in (1.0, 5.0):
+            st = r["stats"][(name, m)]
+            counts = ", ".join(f"{lab} {np.sum(r['src'][name][m] == k)}" for k, lab in enumerate(labels))
+            print(f"{name:22} {m:3.0f}m {st['sunlit_pct']:9.1f} {st['longest_dark_h'] / 24:7.1f} "
+                  f"{st['earth_pct']:8.1f} {st['both_pct']:7.1f}  {counts}")
+
+
+def plot_farfield(r):
+    fig, axes = _fig(1, 1, 10, 4)
+    ax = axes[0, 0]
+    e0, e1 = r["earth_az"]
+    ax.axvspan(e0, e1, color="#c3c2b7", alpha=0.35, lw=0)
+    ax.text((e0 + e1) / 2, 0.02, "Earth\ndirections", transform=ax.get_xaxis_transform(),
+            ha="center", va="bottom", fontsize=8, color=INK2)
+    for (name, col) in zip(r["cases"], (INK2, C2, C1)):
+        st = r["stats"][(name, 1.0)]
+        ax.plot(hz.AZ, r["hor"][name][1.0], color=col, lw=1.8 if col != INK2 else 1.2,
+                label=f"{name}: sunlit {st['sunlit_pct']:.1f}%, Earth visible {st['earth_pct']:.1f}%")
+    ax.set_xlim(0, 360)
+    ax.set_xticks(range(0, 361, 45))
+    ax.set_xlabel("Azimuth, degrees clockwise from north", fontsize=9, color=INK2)
+    ax.set_ylabel("Horizon elevation, degrees", fontsize=9, color=INK2)
+    ax.set_title("Site01 RoI 1, 1 m mast: what distant terrain adds to the horizon (numbers for 2027)",
+                 loc="left", fontsize=10, color=INK)
+    ax.legend(frameon=False, fontsize=8, loc="upper left")
+    return _save(fig, "farfield_site01.png")
+
+
+# ---------------------------------------------------------------- thermal
+def run_thermal(start="2027-01-01T00:00:00Z", days=90):
+    """Flat ground on the equator (0 N, 0 E) with a flat horizon, real Sun
+    positions, through three lunar days. Compare noon and pre-dawn with
+    Diviner equatorial values (Vasavada et al. 2012)."""
+    ets = eph.hourly_ets(start, days * 24)
+    sky = eph.site_sky(0.0, 0.0, 1.0, ets)
+    f = vis.disc_fraction_flat(sky["sun_el"], sky["sun_rad"])
+    T = th.ground_temperature(f, sky["sun_az"], sky["sun_el"], 0.0, 0.0)
+    rises = np.where((f[1:] > 0) & (f[:-1] <= 0))[0]          # last dark hour before each sunrise
+    return {"T": T, "f": f, "noon_max": float(T.max()),
+            "predawn": [float(T[i]) for i in rises],
+            "noon_eq": float(th.t_equilibrium(1.0, 1.0))}
+
+
+def print_thermal(r):
+    print(f"Equator, flat ground: noon max {r['noon_max']:.1f} K (Diviner about 387 to 390 K); "
+          f"pre-dawn {', '.join(f'{t:.1f}' for t in r['predawn'])} K (Diviner about 95 K)")
+    print(f"Night floor {th.T_FLOOR:.1f} K, slab heat capacity {th.HEAT_CAP:.3g} J/m^2/K")
+
+
+def plot_thermal(r):
+    fig, axes = _fig(1, 1, 10, 3.8)
+    ax = axes[0, 0]
+    days = np.arange(len(r["T"])) / 24
+    ax.axhspan(387, 390, color=C2, alpha=0.25, lw=0)
+    ax.text(days[-1], 392, "Diviner noon, 387 to 390 K", ha="right", fontsize=8, color=INK2)
+    ax.axhline(95, color=C2, lw=1, ls="--")
+    ax.text(days[0], 78, "Diviner pre-dawn, about 95 K", ha="left", fontsize=8, color=INK2)
+    ax.plot(days, r["T"], color=C1, lw=1.8, label="model")
+    ax.set_xlabel("Days from 1 Jan 2027", fontsize=9, color=INK2)
+    ax.set_ylabel("Ground temperature, K", fontsize=9, color=INK2)
+    ax.set_ylim(0, 420)
+    ax.set_title("Thermal model on flat ground at the equator, against Diviner equatorial temperatures",
+                 loc="left", fontsize=10, color=INK)
+    return _save(fig, "thermal_equator.png")
+
+
+# ---------------------------------------------------------------- printed-only checks
 def check_disc():
-    """Strip method vs the closed form on a flat horizon, and a tilted horizon."""
-    from pipeline import visibility as vis
-
-    print("Disc fraction: strip method vs closed form, flat horizon at 0 deg\n")
     flat = np.zeros(720)
     for name, rho in (("Sun", 0.27), ("Earth", 0.95)):
         el = np.linspace(-1.5 * rho, 1.5 * rho, 301)
-        f_strip = vis.disc_fraction(flat, np.full_like(el, 100.0), el, rho)
-        f_exact = vis.disc_fraction_flat(el, rho)
-        print(f"{name:6} radius {rho} deg: max |difference| {np.max(np.abs(f_strip - f_exact)):.5f}")
-    # A horizon tilted at 1 deg per deg of azimuth, passing through the disc
-    # centre: by symmetry exactly half the disc shows.
-    tilt = (np.arange(720) * 0.5 - 100.0) * 1.0
+        d = vis.disc_fraction(flat, np.full_like(el, 100.0), el, rho) - vis.disc_fraction_flat(el, rho)
+        print(f"{name}: strip method vs closed form, max |difference| {np.abs(d).max():.5f}")
+    tilt = (np.arange(720) * 0.5 - 100.0)
     f = vis.disc_fraction(tilt, np.array([100.0]), np.array([0.0]), 0.95)[0]
-    print(f"Earth disc, horizon tilted 45 deg through its centre: fraction {f:.4f} (expect 0.5)")
+    print(f"Earth disc, horizon tilted 45 deg through its centre: {f:.4f} (expect 0.5)")
 
 
 def check_slope():
-    """Our plane fit slope vs the PGDA slope map at the site and random points."""
     import rasterio
-    from pipeline.terrain import site_dem, DEM_DIR
-
     dem = site_dem("Site01")
-    rng = np.random.default_rng(1)
     with rasterio.open(DEM_DIR / "Site01_final_adj_5mpp_slp.tif") as src:
         slp = src.read(1)
+    rng = np.random.default_rng(1)
     ny, nx = dem.shape
-    pts = [(-11582.5, -12462.5)]
+    ours, theirs = [], []
     for _ in range(200):
         r, c = rng.integers(10, ny - 10), rng.integers(10, nx - 10)
-        pts.append((dem.x_ul + (c + 0.5) * dem.res, dem.y_ul - (r + 0.5) * dem.res))
-    ours, theirs = [], []
-    for x, y in pts:
-        r, c = (int(round(float(v))) for v in dem.rowcol(x, y))
+        x, y = dem.x_ul + (c + 0.5) * dem.res, dem.y_ul - (r + 0.5) * dem.res
         ours.append(dem.slope(x, y)[0])
         theirs.append(float(slp[r, c]))
     ours, theirs = np.array(ours), np.array(theirs)
     ok = np.isfinite(theirs)
     d = ours[ok] - theirs[ok]
-    print(f"Site01 RoI 1 centroid: ours {ours[0]:.2f} deg, PGDA slope map {theirs[0]:.2f} deg, "
-          f"facing {dem.slope(*pts[0])[1]:.1f} deg")
-    print(f"200 random points: median difference {np.median(d):+.2f} deg, "
-          f"median |difference| {np.median(np.abs(d)):.2f} deg, "
+    print(f"Slope vs PGDA slope map, 200 points: median |difference| {np.median(np.abs(d)):.2f} deg, "
           f"correlation {np.corrcoef(ours[ok], theirs[ok])[0, 1]:.3f}")
 
 
-def check_practice():
-    """Re-run the 13 Nov practice numbers (Site01 high point, 2024 to 2025)
-    with the real pipeline: should land close to the practice results."""
-    from pipeline import horizon as hz
-    from pipeline import visibility as vis
-    from pipeline.terrain import site_dem
-
+def check_nearfield():
     s = SITE01_HIGH
     dem = site_dem("Site01")
     x, y = dem.xy(s["lat"], s["lon"])
-    ground, hor = hz.site_horizon(dem, x, y, masts_m=(1.0, 5.0))
-    n = (np.datetime64("2026-01-01") - np.datetime64("2024-01-01")).astype(int) * 24
-    ets = eph.hourly_ets("2024-01-01T00:00:00Z", n)
-    sky = eph.site_sky(s["lat"], s["lon"], ground + 1.0, ets)
-    practice = {1.0: (87.9, 9.96, 205.3, 59.1), 5.0: (95.6, 3.67, 235.1, 65.0)}
-    print("Site01 high point, 2024-01-01 to 2026-01-01, tile only\n")
-    print(f"{'mast':>5} {'':9} {'sunlit %':>9} {'no Sun d':>9} {'any Sun d':>10} {'Earth %':>8}")
+    ground, out = hz.site_horizon(dem, x, y, masts_m=(1.0, 5.0))
+    for mast, h in out.items():
+        print(f"Site01 high point, tile only, {mast:.0f} m mast: min {h.min():.2f}, max {h.max():.2f}, "
+              f"mean {h.mean():.2f} deg")
+
+
+# ---------------------------------------------------------------- report
+def report():
+    t0 = time.perf_counter()
+    rows, plots = [], []
+
+    e = run_ephemeris()
+    for ref, label in (("horizons", "JPL Horizons"), ("azlcpo", "SPICE azlcpo")):
+        if (ref, "sun") in e:
+            worst = max(np.abs(v).max() for key in ("sun", "earth") for v in e[(ref, key)])
+            rows.append((f"Sun and Earth az/el vs {label} (60 days, hourly)", "< 0.01 deg",
+                         f"max {worst:.5f} deg", worst < 0.01))
+        else:
+            rows.append((f"Sun and Earth az/el vs {label}", "< 0.01 deg", "not run (no network)", None))
+    plots.append(plot_ephemeris(e))
+
+    s = run_synthetic()
+    worst = max(abs(got - exp) for *_, exp, got in s["rows"])
+    rows.append(("Horizon on synthetic map vs hand formula (4 directions)", "< 0.001 deg",
+                 f"max {worst:.5f} deg", worst < 0.001))
+    plots.append(plot_synthetic(s))
+
+    b = run_barker()
     for m in (1.0, 5.0):
-        st = vis.summary(vis.disc_fraction(hor[m], sky["sun_az"], sky["sun_el"], sky["sun_rad"]),
-                         vis.disc_fraction(hor[m], sky["earth_az"], sky["earth_el"], sky["earth_rad"]))
-        p = practice[m]
-        print(f"{m:4.0f}m {'pipeline':9} {st['sunlit_pct']:9.1f} {st['longest_no_sun_h'] / 24:9.2f} "
-              f"{st['longest_lit_h'] / 24:10.1f} {st['earth_pct']:8.1f}")
-        print(f"{'':5} {'practice':9} {p[0]:9.1f} {p[1]:9.2f} {p[2]:10.1f} {p[3]:8.1f}")
+        v = b[("3 tiers", m)]
+        ok = all(barker_within(b, m, k) for k in range(3))
+        rows.append((f"Site01 RoI 1 vs Barker et al. 2021, {m:.0f} m mast", "between rows A and C",
+                     f"{v[0]:.1f}%, LCSP {v[1]:.1f} d, LCIP {v[2]:.1f} d", ok))
+    plots.append(plot_barker(b))
 
+    f = run_farfield()
+    a, c = f["stats"][("site map only", 1.0)], f["stats"][("+ mosaic + 240 m map", 1.0)]
+    a5, c5 = f["stats"][("site map only", 5.0)], f["stats"][("+ mosaic + 240 m map", 5.0)]
+    rows.append(("Far field effect, Site01 RoI 1, 2027 (1 m / 5 m)", "reported",
+                 f"sunlit {c['sunlit_pct'] - a['sunlit_pct']:+.1f} / {c5['sunlit_pct'] - a5['sunlit_pct']:+.1f} pts, "
+                 f"Earth {c['earth_pct'] - a['earth_pct']:+.1f} / {c5['earth_pct'] - a5['earth_pct']:+.1f} pts", None))
+    plots.append(plot_farfield(f))
 
-def check_farfield(site_xy=(-11582.5, -12462.5), year_start="2027-01-01T00:00:00Z", n=8760):
-    """How much each far field tier changes the Site01 RoI 1 numbers, and
-    which tier sets the horizon in each direction."""
-    from pipeline import horizon as hz
-    from pipeline import visibility as vis
-    from pipeline.build import far_tiers
-    from pipeline.terrain import site_dem, mosaic_dem
+    t = run_thermal()
+    rows.append(("Thermal model, equator noon", "387 to 390 K (Diviner)",
+                 f"{t['noon_max']:.0f} K", abs(t["noon_max"] - 388.5) < 6))
+    pd = np.mean(t["predawn"])
+    rows.append(("Thermal model, equator pre-dawn", "about 95 K (Diviner)",
+                 f"{pd:.0f} K (mean of {len(t['predawn'])} nights)", abs(pd - 95) < 6))
+    plots.append(plot_thermal(t))
 
-    dem = site_dem("Site01")
-    x, y = site_xy
-    lat, lon = dem.latlon(x, y)
+    mark = {True: "pass", False: "FAIL", None: "info"}
+    lines = ["# Validation summary", "",
+             f"Generated by `python -m pipeline.validate` on {time.strftime('%d %b %Y %H:%M')}.", "",
+             "| Check | Expected | Result | Status |", "|---|---|---|---|"]
+    lines += [f"| {c} | {e_} | {r_} | {mark[ok]} |" for c, e_, r_, ok in rows]
+    lines += ["", "Plots: " + ", ".join(f"`{p.split('/')[-1]}`" for p in plots if p), ""]
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "summary.md").write_text("\n".join(lines), encoding="utf-8")
 
-    # Do the mosaic and the site map agree on height? (same datum)
-    m80 = mosaic_dem(16)
-    rng = np.random.default_rng(2)
-    px = rng.uniform(dem.x_ul + 200, dem.x_ul + dem.shape[1] * dem.res - 200, 4000)
-    py = rng.uniform(dem.y_ul - dem.shape[0] * dem.res + 200, dem.y_ul - 200, 4000)
-    dz = m80.height(px, py) - dem.height(px, py)
-    dz = dz[np.isfinite(dz)]
-    print(f"Datum check, 4000 points in the Site01 tile: mosaic (80 m) minus site map: "
-          f"median {np.median(dz):+.1f} m, middle 90% {np.percentile(dz, 5):+.0f} to {np.percentile(dz, 95):+.0f} m\n")
-
-    full = far_tiers()                      # mosaic 80 m, then polar 240 m
-    malapert = (site_dem("Site23"), 20.0, 175000.0, 100000.0)
-    cases = {
-        "A tile only": ([], ["tile"]),
-        "B + mosaic": (full[:1], ["tile", "mosaic"]),
-        "C + mosaic + polar 240m": (full, ["tile", "mosaic", "polar"]),
-        "D as C, Site23 5m first": ([full[0], malapert, full[1]], ["tile", "mosaic", "Site23", "polar"]),
-    }
-    ets = eph.hourly_ets(year_start, n)
-    hor, src = {}, {}
-    ground = None
-    for name, (far, _) in cases.items():
-        ground, hor[name], src[name] = hz.site_horizon(dem, x, y, (1.0, 5.0), far, with_source=True)
-    sky = eph.site_sky(lat, lon, ground + 1.0, ets)
-
-    earth_az = (hz.AZ >= 129) & (hz.AZ <= 145)
-    print(f"Site01 RoI 1 centroid, ground {ground:.1f} m. Horizon change vs tile only (deg), "
-          f"and how many of the 720 azimuths each tier sets:")
-    for name, (_, labels) in cases.items():
-        for m in (1.0, 5.0):
-            rise = hor[name][m] - hor["A tile only"][m]
-            counts = ", ".join(f"{lab} {np.sum(src[name][m] == k)}" for k, lab in enumerate(labels))
-            print(f"  {name:24} {m:.0f}m  mean rise {rise.mean():5.2f}, max {rise.max():5.2f}, "
-                  f"Earth dirs {rise[earth_az].mean():5.2f} | {counts}")
-
-    print(f"\n2027, hourly:                    {'sunlit %':>9} {'dark d':>7} {'Earth %':>8} {'blackout d':>11} {'both %':>7}")
-    for name in cases:
-        for m in (1.0, 5.0):
-            st = vis.summary(vis.disc_fraction(hor[name][m], sky["sun_az"], sky["sun_el"], sky["sun_rad"]),
-                             vis.disc_fraction(hor[name][m], sky["earth_az"], sky["earth_el"], sky["earth_rad"]))
-            print(f"  {name:24} {m:.0f}m {st['sunlit_pct']:9.1f} {st['longest_dark_h'] / 24:7.1f} "
-                  f"{st['earth_pct']:8.1f} {st['longest_blackout_h'] / 24:11.1f} {st['both_pct']:7.1f}")
-    return hor, src
-
-
-def check_barker():
-    """Site01 RoI 1 over Barker et al. (2021)'s period with Barker's definitions:
-    average illumination = mean visible fraction; LCSP = longest run with no
-    Sun at all (f = 0); LCIP = longest run with any Sun (f > 0).
-    Barker Table 2 values are clone percentiles: row A averages the RoI
-    (cautious), row C takes the best pixel each hour (optimistic)."""
-    from pipeline import horizon as hz
-    from pipeline import visibility as vis
-    from pipeline.build import far_tiers
-    from pipeline.terrain import site_dem
-
-    dem = site_dem("Site01")
-    x, y = -11582.5, -12462.5
-    lat, lon = dem.latlon(x, y)
-    n = (np.datetime64("2026-01-01") - np.datetime64("2024-01-01")).astype(int) * 24
-    ets = eph.hourly_ets("2024-01-01T00:00:00Z", n)
-    barker = {1.0: {"A": (68.03, 16.55, 63.35), "C": (85.84, 10.46, 205.38)},
-              5.0: {"A": (89.26, 5.29, 215.79), "C": (91.83, 3.7, 232.50)}}
-    rows = {}
-    for name, far in (("ours, tile only", []), ("ours, 3 tiers", far_tiers())):
-        ground, hor = hz.site_horizon(dem, x, y, (1.0, 5.0), far)
-        sky = eph.site_sky(lat, lon, ground + 1.0, ets)
-        for m in (1.0, 5.0):
-            f = vis.disc_fraction(hor[m], sky["sun_az"], sky["sun_el"], sky["sun_rad"])
-            rows[(name, m)] = (100 * f.mean(), vis.longest_run(f <= 0) / 24, vis.longest_run(f > 0) / 24)
-    print("Site01 RoI 1, 2024-01-01 to 2026-01-01, hourly, Barker's definitions\n")
-    print(f"{'mast':5} {'source':34} {'avg illum %':>11} {'LCSP d':>8} {'LCIP d':>8}")
-    for m in (1.0, 5.0):
-        for name in ("ours, tile only", "ours, 3 tiers"):
-            r = rows[(name, m)]
-            print(f"{m:3.0f} m {name:34} {r[0]:11.1f} {r[1]:8.2f} {r[2]:8.1f}")
-        for case, label in (("A", "Barker A (RoI average, cautious)"), ("C", "Barker C (best pixel, optimistic)")):
-            b = barker[m][case]
-            print(f"{'':5} {label:34} {b[0]:11.1f} {b[1]:8.2f} {b[2]:8.1f}")
-        print()
-
-
-def check_thermal():
-    """Thermal model sanity checks against known lunar temperatures."""
-    from pipeline import thermal as th
-
-    print(f"Constants: albedo {th.ALBEDO}, emissivity {th.EMISSIVITY}, S {th.S_1AU} W/m^2, "
-          f"heat flow {th.HEAT_FLOW * 1000:.0f} mW/m^2")
-    print(f"Night floor T_floor = {th.T_FLOOR:.1f} K; slab heat capacity C = {th.HEAT_CAP:.3g} J/m^2/K\n")
-    noon = th.t_equilibrium(1.0, th.cos_incidence(0.0, 90.0, 0.0, 0.0))
-    print(f"Flat ground, Sun overhead (equator at noon): {float(noon):.1f} K   (Diviner: about 387 to 390 K)")
-    for start in (390.0, 250.0, 150.0):
-        T = start
-        for _ in range(int(th.NIGHT_S / 3600)):
-            T = th.cool(T, 3600.0)
-        print(f"Cooling for one equatorial night (14.77 d) from {start:.0f} K: {T:.1f} K   (Diviner pre-dawn: about 95 K)")
-    T, days = 200.0, {}
-    for h in range(1, 200 * 24 + 1):
-        T = th.cool(T, 3600.0)
-        if h % (24 * 50) == 0 or h in (24, 24 * 10):
-            days[h // 24] = T
-    print("Polar shadow, starting at 200 K: " + ", ".join(f"{d} d {t:.0f} K" for d, t in days.items()))
-    for el, slope, face in ((1.5, 0, 0), (1.5, 5, 180), (1.5, 5, 0), (1.5, 20, 180)):
-        ci = th.cos_incidence(180.0, el, slope, face)
-        print(f"Sun at az 180, el {el} deg; slope {slope:2d} deg facing {face:3d}: "
-              f"cos i {float(ci):.3f}, T_eq {float(th.t_equilibrium(1.0, ci)):.0f} K")
+    w = max(len(r[0]) for r in rows)
+    for c, e_, r_, ok in rows:
+        print(f"{mark[ok]:5} {c:{w}}  {r_}   (expected {e_})")
+    print(f"\nwrote docs/validation/summary.md and {sum(1 for p in plots if p)} plots, "
+          f"{time.perf_counter() - t0:.0f} s")
 
 
 CHECKS = {
-    "horizons": check_horizons,
-    "horizon-synthetic": check_horizon_synthetic,
-    "horizon-site01": check_horizon_site01,
+    "ephemeris": lambda: print_ephemeris(run_ephemeris()),
+    "synthetic": lambda: print_synthetic(run_synthetic()),
+    "barker": lambda: print_barker(run_barker()),
+    "farfield": lambda: print_farfield(run_farfield()),
+    "thermal": lambda: print_thermal(run_thermal()),
     "disc": check_disc,
     "slope": check_slope,
-    "practice": check_practice,
-    "farfield": check_farfield,
-    "barker": check_barker,
-    "thermal": check_thermal,
+    "nearfield": check_nearfield,
 }
 
 if __name__ == "__main__":
-    what = sys.argv[1] if len(sys.argv) > 1 else "horizons"
-    if what not in CHECKS:
-        sys.exit(f"unknown check: {what}; choose from {', '.join(CHECKS)}")
-    CHECKS[what]()
+    what = sys.argv[1] if len(sys.argv) > 1 else "report"
+    if what == "report":
+        report()
+    elif what in CHECKS:
+        CHECKS[what]()
+    else:
+        sys.exit(f"unknown check: {what}; choose report or one of {', '.join(CHECKS)}")
