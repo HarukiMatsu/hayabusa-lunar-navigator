@@ -112,6 +112,22 @@ Compare to evaluate the conditions
 
 <section className="metrics">
 <h2>Mission Metrics</h2>
+<div className="metrics-grid">
+<p>Sunlit Time</p>
+<h3>--%</h3>
+<span>Of mission duration</span>
+</div>
+<div classNam="metric-card">
+<p>Longest Darkness</p>
+<h3>-- hrs</h3>
+<span>Continuous time without sunglight</span>
+
+<div className="metric-card">
+<p>Earths visiblity</p>
+<h3>--%</h3>
+<span>Of mission duration</span>
+</div>
+</div>
 </section>
 </div>
 

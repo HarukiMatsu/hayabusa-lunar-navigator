@@ -257,3 +257,24 @@ margin-bottom: 24px;
   font-size: 13px;
   line-height: 1.6;
 }
+.metrics {
+padding: 22px;
+background: #14243b;
+border: 1px solid #293d56;
+border-radius: 10px;
+}
+.metrics h2 {
+margin: 0 0 20px;
+font-size: 16px;
+}
+.metrics-grid {
+display: grid;
+grid-template-columns: repeate(3, 1fr);
+gap: 12px;
+}
+.metric-card {
+padding: 16px;
+background:#0b1423;
+border: 1px solid #293d56;
+border-radius: 8px;
+}
