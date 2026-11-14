@@ -154,8 +154,38 @@ Compare to evaluate the conditions
 </section>
 
 <section className="timeline">
+<div className="section-heading">
 <h2>Mission Timeline</h2>
+<span className="verdict-status">Mission Overview</span>
+</div>
+<div className="timeline-events">
+<div className="timeline-event">
+<div className="timeline-marker sunrise"></div>
+<div className="timeline-details">
+<h3>Sunrise</h3>
+<p>Sunlight reaches landing site</p>
+<span>Day 1 : 06:00</span>
+</div>
+</div>
+<div className="timeline-event">
+<div className="timeline-marker sunset"></div>
+<div className="timeline-details">
+<h3>Sunset</h3>
+<p>Landing site enters darkness</p>
+<span>Day 1 : 18:00</span>
+</div>
+</div>
+<div className="timeline-event">
+<div className="timeline-marker sunrise"></div>
+<div className="timeline-details">
+<h3>Sunrise</h3>
+<p>Sunlight returns to landing site</p>
+<span>Day 2 : 06:00</span>
+</div>
+</div>
 
+
+</div>
 </section>
 
 </div> 

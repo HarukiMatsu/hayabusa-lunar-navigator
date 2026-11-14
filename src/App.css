@@ -363,3 +363,65 @@ clip-path: polygon(
   font-size: 12px;
   flex-wrap: wrap;
 }
+.timeline {
+padding: 22px;
+background: #14243b;
+border: 1px solid #293d56;
+border-radius: 10px;
+}
+
+.timeline .section-heading h2 {
+margin: 0;
+font-size: 16px;
+}
+.timeline-events {
+position: relative;
+display: flex;
+flex-direction: column;
+gap: 24px;
+padding-left: 10px;
+}
+.timeline-events::before {
+content: "";
+position: absolute;
+left: 19px;
+top: 10px;
+bottom: 10px;
+width: 2px;
+background: #293d56;
+}
+.timeline-events {
+position: relative;
+display: flex;
+align-items: flex-start;
+gap: 18px;
+}
+.timeline-marker {
+position: relative;
+z-index: 1;
+flex-shrink:  0;
+width: 18px;
+height: 18px;
+border-radius: 50%;
+border: 3px solid #14243b;
+}
+.timeline-marker.sunrise {
+background: #e7b343;
+}
+.timeline-marker.sunset {
+background: #646664
+}
+.timeline-details h3 {
+margin: 0 0 5px;
+font-size: 14px;
+color: #edf4ff;
+}
+.timeline-details p {
+margin: 0 0 6px;
+font-size: 12px;
+color: #91a9c7;
+}
+.timeline-details span {
+font-size: 10px;
+color: #a8ceff;
+}
