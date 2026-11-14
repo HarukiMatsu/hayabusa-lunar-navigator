@@ -1,0 +1,6 @@
+raw/
+kernels/
+.venv/
+__pycache__/
+*.pyc
+docs/papers/
