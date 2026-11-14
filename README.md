@@ -13,7 +13,7 @@ For each site, hourly through 2027:
 - the fraction of the Sun's disc and of Earth's disc above that horizon, for a 1 m and a 5 m mast
 - a simple ground temperature estimate
 
-Sites: Site01 (connecting ridge), Site04 (Shackleton rim), Site11 (de Gerlache rim) and Site23 (Malapert massif).
+Sites: Site01 (connecting ridge), Site04 (Shackleton rim), Site11 (de Gerlache rim) and Site23 (Malapert massif). Site01, Site04 and Site11 also have extra candidate points at regions 2 and 3 of Barker et al. (2021).
 
 The Python pipeline writes everything to one file, `web/data/visibility.json`, which the web app reads. The data format is described in section 5 of `CLAUDE.md`.
 

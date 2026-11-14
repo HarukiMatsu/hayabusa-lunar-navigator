@@ -54,6 +54,21 @@ SITES = [
     {"id": "site23", "name": "Site23 Malapert massif", "dem": "Site23",
      "x": 4392.5, "y": 121637.5,
      "source": "Highest point of PGDA Site23 tile (Malapert summit)"},
+    # Extra candidates: Barker RoIs 2 and 3, reference X/Y from the RoI .dbf
+    # table. For Site11 the .dbf row order and the polygon order disagree
+    # after RoI 2 (row 4 is garbled); we use the .dbf X/Y for RoI 3.
+    {"id": "site01_roi2", "name": "Connecting ridge, region 2", "dem": "Site01",
+     "x": -11487.5, "y": -12557.5, "source": "Barker et al. (2021), Site 1 RoI 2"},
+    {"id": "site01_roi3", "name": "Connecting ridge, region 3", "dem": "Site01",
+     "x": -11352.5, "y": -12502.5, "source": "Barker et al. (2021), Site 1 RoI 3"},
+    {"id": "site04_roi2", "name": "Shackleton rim, region 2", "dem": "Site04",
+     "x": -2757.5, "y": -6342.5, "source": "Barker et al. (2021), Site 4 RoI 2"},
+    {"id": "site04_roi3", "name": "Shackleton rim, region 3", "dem": "Site04",
+     "x": -2677.5, "y": -6107.5, "source": "Barker et al. (2021), Site 4 RoI 3"},
+    {"id": "site11_roi2", "name": "de Gerlache rim, region 2", "dem": "Site11",
+     "x": -37392.5, "y": 14762.5, "source": "Barker et al. (2021), Site 11 RoI 2"},
+    {"id": "site11_roi3", "name": "de Gerlache rim, region 3", "dem": "Site11",
+     "x": -36517.5, "y": 14362.5, "source": "Barker et al. (2021), Site 11 RoI 3"},
 ]
 TIER_NAMES = ("tile", "mosaic", "polar")
 
