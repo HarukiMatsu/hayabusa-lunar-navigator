@@ -37,10 +37,11 @@ System Ready
 
 </header>
 
+<div className="dashboard-layout">
+
+<div className="left-column">
 <section className="configuration">
 <h2>Mission Configuration</h2>
-
-
 </section>
 
 <section className="verdict">
@@ -50,19 +51,20 @@ System Ready
 <section className="metrics">
 <h2>Mission Metrics</h2>
 </section>
+</div>
 
-<section className="visuals">
-<div className= "sky-view">
+<div className="right-column">
+<section className="sky-view">
 <h2>Sky View</h2>
-</div>
+</section>
 
-<div className="timeline">
+<section className="timeline">
 <h2>Mission Timeline</h2>
-</div>
-
 
 </section>
 
+</div> 
+</div>
 
 </main>
 
