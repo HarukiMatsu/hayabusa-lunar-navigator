@@ -3,14 +3,11 @@
 // of elevation are readable; Sun and Earth are markers, not to scale.
 // Close-ups: 8 x 5 degree windows at equal scale, so each disc and the
 // horizon behind it are drawn at their true angular sizes.
+// Colours come from CSS variables (see index.css): the sky is always black.
 
 // Mean angular radii. The Sun varies by about 1% over the year, Earth by about 7%.
-export const SUN_RADIUS_DEG = 0.27
-export const EARTH_RADIUS_DEG = 0.95
-
-const SUN_COLOR = '#f2b84b'
-const EARTH_COLOR = '#4ea3ff'
-const HORIZON_COLOR = '#91a9c7'
+const SUN_RADIUS_DEG = 0.27
+const EARTH_RADIUS_DEG = 0.95
 
 /** Horizon height at any azimuth, linear between the 0.5 degree samples. */
 function horizonAt(horizon, az) {
@@ -33,8 +30,19 @@ function meanAzimuth(values, from, to) {
 
 const compass = {0: 'N', 45: 'NE', 90: 'E', 135: 'SE', 180: 'S', 225: 'SW', 270: 'W', 315: 'NW'}
 
-function Panorama({site, horizon, range, index, sunUp, earthUp}) {
-  const W = 720, H = 280, L = 40, R = 10, T = 12, B = 24
+function visibility(site, mast) {
+  return {
+    horizon: mast === '5m' ? site.horizon_5m : site.horizon,
+    sunVis: mast === '5m' ? site.sun_5m : site.sun,
+    earthVis: mast === '5m' ? site.earth_5m : site.earth,
+  }
+}
+
+export default function SkyView({site, mast, range, index}) {
+  const {horizon, sunVis, earthVis} = visibility(site, mast)
+  const sunUp = sunVis[index] >= 0.5
+  const earthUp = earthVis[index] >= 0.5
+  const W = 1200, H = 440, L = 48, R = 12, T = 14, B = 34
   // Centre the view on Earth's mean direction so Earth never wraps at the edge.
   const centre = Math.round(meanAzimuth(site.earth_az, range.from, range.to) / 10) * 10
   const rel = (az) => ((az - centre + 540) % 360) - 180      // -180 .. 180
@@ -83,56 +91,46 @@ function Panorama({site, horizon, range, index, sunUp, earthUp}) {
   for (let e = Math.ceil(lo); e <= hi; e += (hi - lo > 10 ? 2 : 1)) elTicks.push(e)
 
   return (
-    <svg className="sky-svg" viewBox={`0 0 ${W} ${H}`} role="img"
-      aria-label="Panorama of the terrain horizon with the Sun and Earth">
-      <defs>
-        <linearGradient id="sky-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#081426" />
-          <stop offset="1" stopColor="#172b45" />
-        </linearGradient>
-        <linearGradient id="ground-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0" stopColor="#536174" />
-          <stop offset="1" stopColor="#26364a" />
-        </linearGradient>
-      </defs>
-      <rect x={L} y={T} width={W - L - R} height={H - T - B} fill="url(#sky-grad)" />
-      {elTicks.map((e) => (
-        <g key={`e${e}`}>
-          <line x1={L} x2={W - R} y1={y(e)} y2={y(e)} stroke="#293d56" strokeWidth={e === 0 ? 1 : 0.5} />
-          <text x={L - 6} y={y(e) + 3} textAnchor="end" className="sky-axis">{e}°</text>
-        </g>
-      ))}
-      {track(site.sun_az, site.sun_el).map((p, k) => (
-        <polyline key={`s${k}`} points={p} fill="none" stroke={SUN_COLOR} strokeOpacity="0.45" strokeWidth="1.5" />
-      ))}
-      {track(site.earth_az, site.earth_el).map((p, k) => (
-        <polyline key={`t${k}`} points={p} fill="none" stroke={EARTH_COLOR} strokeOpacity="0.45" strokeWidth="1.5" />
-      ))}
-      <circle cx={x(site.sun_az[index])} cy={y(site.sun_el[index])} r="7" fill={SUN_COLOR} />
-      <circle cx={x(site.earth_az[index])} cy={y(site.earth_el[index])} r="7" fill={EARTH_COLOR} />
-      <polygon points={ground} fill="url(#ground-grad)" stroke={HORIZON_COLOR} strokeWidth="1.5" />
-      {/* A body hidden behind terrain keeps a dashed outline so it can still be found. */}
-      {!sunUp && (
-        <circle cx={x(site.sun_az[index])} cy={y(site.sun_el[index])} r="7" fill="none"
-          stroke={SUN_COLOR} strokeWidth="1.5" strokeDasharray="3 2" />
-      )}
-      {!earthUp && (
-        <circle cx={x(site.earth_az[index])} cy={y(site.earth_el[index])} r="7" fill="none"
-          stroke={EARTH_COLOR} strokeWidth="1.5" strokeDasharray="3 2" />
-      )}
-      {ticks.map((a) => (
-        <text key={`a${a}`} x={x(a)} y={H - 8} textAnchor="middle" className="sky-axis">
-          {compass[a]} {a}°
+    <div className="sky-scroll">
+      <svg className="sky-svg" viewBox={`0 0 ${W} ${H}`} role="img"
+        aria-label={`Panorama of the terrain horizon. The Sun is ${sunUp ? 'in view' : 'hidden'} and Earth is ${earthUp ? 'in view' : 'hidden'}.`}>
+        <rect x="0" y="0" width={W} height={H} className="sky-fill" />
+        {elTicks.map((e) => (
+          <g key={`e${e}`}>
+            <line x1={L} x2={W - R} y1={y(e)} y2={y(e)} className={e === 0 ? 'sky-grid zero' : 'sky-grid'} />
+            <text x={L - 8} y={y(e) + 5} textAnchor="end" className="sky-axis">{e}°</text>
+          </g>
+        ))}
+        {track(site.sun_az, site.sun_el).map((p, k) => (
+          <polyline key={`s${k}`} points={p} className="path-sun" />
+        ))}
+        {track(site.earth_az, site.earth_el).map((p, k) => (
+          <polyline key={`t${k}`} points={p} className="path-earth" />
+        ))}
+        <circle cx={x(site.sun_az[index])} cy={y(site.sun_el[index])} r="10" className="body-sun" />
+        <circle cx={x(site.earth_az[index])} cy={y(site.earth_el[index])} r="10" className="body-earth" />
+        <polygon points={ground} className="terrain" />
+        {/* A body hidden behind terrain keeps a dashed outline so it can still be found. */}
+        {!sunUp && (
+          <circle cx={x(site.sun_az[index])} cy={y(site.sun_el[index])} r="10" className="hidden-sun" />
+        )}
+        {!earthUp && (
+          <circle cx={x(site.earth_az[index])} cy={y(site.earth_el[index])} r="10" className="hidden-earth" />
+        )}
+        {ticks.map((a) => (
+          <text key={`a${a}`} x={x(a)} y={H - 10} textAnchor="middle" className="sky-axis">
+            {compass[a]} {a}°
+          </text>
+        ))}
+        <text x={W - R - 6} y={T + 16} textAnchor="end" className="sky-axis">
+          Height stretched {Math.round(pxPerDegY / pxPerDegX)} times; Sun and Earth markers not to scale
         </text>
-      ))}
-      <text x={W - R - 4} y={T + 12} textAnchor="end" className="sky-axis">
-        Height stretched {Math.round(pxPerDegY / pxPerDegX)}x; markers not to scale
-      </text>
-    </svg>
+      </svg>
+    </div>
   )
 }
 
-function Closeup({label, color, az, el, radius, horizon, fraction}) {
+function Closeup({label, kind, az, el, radius, horizon, fraction}) {
   const W = 200, H = 125, SPAN = 8                  // degrees across
   const s = W / SPAN                                 // pixels per degree, both axes
   const x = (a) => W / 2 + (((a - az + 540) % 360) - 180) * s
@@ -143,46 +141,28 @@ function Closeup({label, color, az, el, radius, horizon, fraction}) {
   }
   const ground = `${x(az - SPAN / 2 - 0.5)},${H} ${pts.join(' ')} ${x(az + SPAN / 2 + 0.5)},${H}`
   return (
-    <figure className="sky-closeup">
+    <figure className="closeup">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`${label} close-up at true scale`}>
-        <rect width={W} height={H} fill="#081426" />
-        <circle cx={W / 2} cy={H / 2} r={radius * s} fill={color} />
-        <polygon points={ground} fill="#3c4a5e" stroke={HORIZON_COLOR} strokeWidth="1.2" />
+        <rect width={W} height={H} className="sky-fill" />
+        <circle cx={W / 2} cy={H / 2} r={radius * s} className={`body-${kind}`} />
+        <polygon points={ground} className="terrain" />
       </svg>
       <figcaption>
-        {label}: {Math.round(fraction * 100)}% of disc visible. Elevation {el.toFixed(2)}°,
-        terrain behind it {horizonAt(horizon, az).toFixed(2)}°, azimuth {az.toFixed(1)}°
+        <strong>{label}: {Math.round(fraction * 100)}% of the disc in view.</strong>{' '}
+        Elevation {el.toFixed(2)}°, terrain behind it {horizonAt(horizon, az).toFixed(2)}°.
       </figcaption>
     </figure>
   )
 }
 
-export default function SkyView({site, mast, range, index, timeLabel, playing, onTogglePlay, onIndexChange}) {
-  const horizon = mast === '5m' ? site.horizon_5m : site.horizon
-  const sunVis = mast === '5m' ? site.sun_5m : site.sun
-  const earthVis = mast === '5m' ? site.earth_5m : site.earth
+export function Closeups({site, mast, index}) {
+  const {horizon, sunVis, earthVis} = visibility(site, mast)
   return (
-    <>
-      <div className="sky-display">
-        <Panorama site={site} horizon={horizon} range={range} index={index}
-          sunUp={sunVis[index] >= 0.5} earthUp={earthVis[index] >= 0.5} />
-      </div>
-      <div className="sky-controls">
-        <button type="button" className="play-button" onClick={onTogglePlay}
-          aria-label={playing ? 'Pause' : 'Play through the mission'}>
-          {playing ? 'Pause' : 'Play'}
-        </button>
-        <input type="range" min={range.from} max={range.to - 1} step={1} value={index}
-          onChange={(event) => onIndexChange(Number(event.target.value))}
-          aria-label="Time within the mission" />
-        <span className="sky-time">{timeLabel}</span>
-      </div>
-      <div className="sky-closeups">
-        <Closeup label="Sun" color={SUN_COLOR} az={site.sun_az[index]} el={site.sun_el[index]}
-          radius={SUN_RADIUS_DEG} horizon={horizon} fraction={sunVis[index]} />
-        <Closeup label="Earth" color={EARTH_COLOR} az={site.earth_az[index]} el={site.earth_el[index]}
-          radius={EARTH_RADIUS_DEG} horizon={horizon} fraction={earthVis[index]} />
-      </div>
-    </>
+    <div className="closeups">
+      <Closeup label="Sun" kind="sun" az={site.sun_az[index]} el={site.sun_el[index]}
+        radius={SUN_RADIUS_DEG} horizon={horizon} fraction={sunVis[index]} />
+      <Closeup label="Earth" kind="earth" az={site.earth_az[index]} el={site.earth_el[index]}
+        radius={EARTH_RADIUS_DEG} horizon={horizon} fraction={earthVis[index]} />
+    </div>
   )
 }

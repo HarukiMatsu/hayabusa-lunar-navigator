@@ -1,10 +1,9 @@
 // Mission timeline: one bar per hour for sunlight and for Earth in view.
+// Each row is an SVG in hour units stretched to the full width, so the rows
+// share the time axis of the slider above them at any screen width.
 // Consecutive hours in the same state are drawn as one rectangle.
 
 import {UP} from './model.js'
-
-const SUN_COLOR = '#f2b84b'
-const EARTH_COLOR = '#4ea3ff'
 
 /** Runs of equal state between from and to: [{start, end, state}]. */
 function runs(values, from, to, stateOf) {
@@ -23,54 +22,52 @@ function runs(values, from, to, stateOf) {
 const sunState = (f) => (f >= UP ? 'full' : f > 0 ? 'partial' : 'none')
 const earthState = (f) => (f >= UP ? 'up' : 'down')
 
-export default function Timeline({sunVis, earthVis, range, index, stepHours, onIndexChange}) {
-  const W = 720, L = 92, R = 8, ROW = 26, GAP = 10, TOP = 6
-  const H = TOP + 2 * ROW + GAP + 26
-  const n = range.to - range.from
-  const x = (i) => L + ((i - range.from) / n) * (W - L - R)
-  const sunY = TOP, earthY = TOP + ROW + GAP
+function Row({label, track, children, n, cursor, onPick}) {
+  return (
+    <div className="tl-row">
+      <span className="tl-label">{label}</span>
+      <svg className={`tl-bar ${track}`} viewBox={`0 0 ${n} 1`} preserveAspectRatio="none"
+        onClick={onPick} aria-hidden="true">
+        {children}
+        <line x1={cursor + 0.5} x2={cursor + 0.5} y1="0" y2="1" className="tl-cursor" vectorEffect="non-scaling-stroke" />
+      </svg>
+    </div>
+  )
+}
 
-  const days = []
+export default function Timeline({sunVis, earthVis, range, index, stepHours, onIndexChange}) {
+  const n = range.to - range.from
   const hoursPerDay = 24 / stepHours
-  const dayStep = n / hoursPerDay > 16 ? 2 : 1
-  for (let d = 0; d * hoursPerDay <= n; d += dayStep) days.push(d)
+  const days = Math.floor(n / hoursPerDay)
+  const labelStep = days > 16 ? 2 : 1
 
   const pick = (event) => {
     const box = event.currentTarget.getBoundingClientRect()
-    const px = ((event.clientX - box.left) / box.width) * W
-    if (px < L) return
-    const i = range.from + Math.floor(((px - L) / (W - L - R)) * n)
+    const i = range.from + Math.floor(((event.clientX - box.left) / box.width) * n)
     onIndexChange(Math.min(Math.max(i, range.from), range.to - 1))
   }
+  const cursor = index - range.from
 
   return (
-    <svg className="timeline-svg" viewBox={`0 0 ${W} ${H}`} onClick={pick} role="img"
-      aria-label="Hourly sunlight and Earth visibility across the mission">
-      <text x={L - 8} y={sunY + ROW / 2 + 4} textAnchor="end" className="sky-axis">Sunlight</text>
-      <text x={L - 8} y={earthY + ROW / 2 + 4} textAnchor="end" className="sky-axis">Earth in view</text>
-      <rect x={L} y={sunY} width={W - L - R} height={ROW} fill="#0b1423" />
-      <rect x={L} y={earthY} width={W - L - R} height={ROW} fill="#0b1423" />
-      {runs(sunVis, range.from, range.to, sunState).filter((r) => r.state !== 'none').map((r) => (
-        <rect key={`s${r.start}`} x={x(r.start)} y={sunY} width={x(r.end) - x(r.start)} height={ROW}
-          fill={SUN_COLOR} fillOpacity={r.state === 'full' ? 1 : 0.35} />
-      ))}
-      {runs(earthVis, range.from, range.to, earthState).filter((r) => r.state === 'up').map((r) => (
-        <rect key={`e${r.start}`} x={x(r.start)} y={earthY} width={x(r.end) - x(r.start)} height={ROW}
-          fill={EARTH_COLOR} />
-      ))}
-      {days.map((d) => (
-        <g key={`d${d}`}>
-          <line x1={x(range.from + d * hoursPerDay)} x2={x(range.from + d * hoursPerDay)}
-            y1={sunY} y2={earthY + ROW + 4} stroke="#293d56" strokeWidth="0.75" />
-          {(d + 1) * hoursPerDay <= n && (
-            <text x={x(range.from + (d + 0.5) * hoursPerDay)} y={H - 6} textAnchor="middle" className="sky-axis">
-              Day {d + 1}
-            </text>
-          )}
-        </g>
-      ))}
-      <line x1={x(index + 0.5)} x2={x(index + 0.5)} y1={sunY - 3} y2={earthY + ROW + 3}
-        stroke="#edf4ff" strokeWidth="1.5" />
-    </svg>
+    <div className="timeline" role="img"
+      aria-label={`Hour by hour sunlight and Earth visibility over ${days} days`}>
+      <Row label="Sunlight" track="tl-track-sun" n={n} cursor={cursor} onPick={pick}>
+        {runs(sunVis, range.from, range.to, sunState).filter((r) => r.state !== 'none').map((r) => (
+          <rect key={r.start} x={r.start - range.from} y="0" width={r.end - r.start} height="1"
+            className={r.state === 'full' ? 'tl-sun' : 'tl-sun-partial'} />
+        ))}
+      </Row>
+      <Row label="Earth in view" track="tl-track-earth" n={n} cursor={cursor} onPick={pick}>
+        {runs(earthVis, range.from, range.to, earthState).filter((r) => r.state === 'up').map((r) => (
+          <rect key={r.start} x={r.start - range.from} y="0" width={r.end - r.start} height="1" className="tl-earth" />
+        ))}
+      </Row>
+      <div className="tl-days" aria-hidden="true">
+        {Array.from({length: days}, (_, d) => d).filter((d) => d % labelStep === 0).map((d) => (
+          <span key={d} className={[(d / labelStep) % 2 === 0 ? 'm2' : '', (d / labelStep) % 4 === 0 ? 'm4' : ''].join(' ').trim() || undefined}
+            style={{left: `${((d + 0.5) * hoursPerDay * 100) / n}%`}}>Day {d + 1}</span>
+        ))}
+      </div>
+    </div>
   )
 }

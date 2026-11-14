@@ -1,24 +1,17 @@
 import {useEffect, useState} from 'react'
 import './App.css'
 import visibilityUrl from '../data/visibility.json?url'
-import {checkMission, DEFAULT_LANDER, DEFAULT_REQUIREMENTS, missionRange, series, summarise} from './model.js'
+import {checkMission, DEFAULT_LANDER, DEFAULT_REQUIREMENTS, missionRange, series, summarise, UP} from './model.js'
 import Verdict from './Verdict.jsx'
+import Requirements from './Requirements.jsx'
 import Compare from './Compare.jsx'
 import Calendar from './Calendar.jsx'
-import SkyView from './SkyView.jsx'
+import SkyView, {Closeups} from './SkyView.jsx'
 import Timeline from './Timeline.jsx'
 import Countdown from './Countdown.jsx'
 
 function formatPct(share) {
-return `${(100 * share).toFixed(1)}%`
-}
-
-function formatHours(hours) {
-return `${hours} hrs`
-}
-
-function formatDays(hours) {
-return `${(hours / 24).toFixed(1)} days. `
+return `${(100 * share).toFixed(1)}`
 }
 
 // "YYYY-MM-DDTHH:MM" in UTC, the format a datetime-local input uses.
@@ -28,6 +21,15 @@ return new Date(ms).toISOString().slice(0, 16)
 
 function formatLatLon(lat, lon) {
 return `${Math.abs(lat).toFixed(2)}°${lat < 0 ? 'S' : 'N'}, ${Math.abs(lon).toFixed(2)}°${lon < 0 ? 'W' : 'E'}`
+}
+
+function Metric({value, unit, label}) {
+return (
+<div className="metric">
+<dt>{label}</dt>
+<dd><span className="numeral">{value}</span><span className="unit">{unit}</span></dd>
+</div>
+)
 }
 
 function App() {
@@ -75,7 +77,6 @@ const verdict = site && range
 ? checkMission(site, range, requirements, DEFAULT_LANDER, data.meta.step_hours, mastHeight)
 : null
 
-
 // Selected moment within the mission, as hours after landing. Shared by the
 // sky view, timeline and countdown. Play steps one hour every 60 ms.
 const [timeOffset, setTimeOffset] = useState(0)
@@ -84,7 +85,7 @@ const windowHours = range ? range.to - range.from : 0
 const offset = Math.min(Math.max(timeOffset, 0), Math.max(windowHours - 1, 0))
 const timeIndex = range ? range.from + offset : 0
 const timeLabel = data
-? `${new Date(dataStartMs + timeIndex * data.meta.step_hours * HOUR_MS).toISOString().slice(0, 16).replace('T', ' ')} UTC, day ${Math.floor(offset / 24) + 1} hour ${offset % 24}`
+? `${new Date(dataStartMs + timeIndex * data.meta.step_hours * HOUR_MS).toISOString().slice(0, 16).replace('T', ' ')} UTC, day ${Math.floor(offset / 24) + 1}, hour ${offset % 24}`
 : ''
 
 useEffect(() => {
@@ -105,6 +106,17 @@ const togglePlay = () => {
 if (!playing && offset >= windowHours - 1) setTimeOffset(0)
 setPlaying(!playing)
 }
+const jumpTo = (i) => {
+setPlaying(false)
+setTimeOffset(i - range.from)
+}
+
+// The page is lit by the Sun in the data: light theme when at least half the
+// Sun's disc is visible at the selected hour, dark theme otherwise.
+const lit = site && range ? series(site, 'sun', mastHeight)[timeIndex] >= UP : true
+useEffect(() => {
+document.documentElement.dataset.theme = lit ? 'lit' : 'shadow'
+}, [lit])
 
 // Saved scenarios for side-by-side comparison (at most MAX_SCENARIOS).
 const MAX_SCENARIOS = 4
@@ -120,149 +132,49 @@ return (
 <main className="dashboard">
 
 <header className="topbar">
-<div className="brand">
-
-<div className="logo">
-X
-</div>
-
-<div className="brand-text">
-<h1>Lunar Navigator</h1>
-<p> Mission Planning System</p>
-</div>
-
-</div>
-
-<div className="topbar-information">
-
-<div className="system-status">
-{loadError ? `Data failed to load: ${loadError}` : data ? `${data.sites.length} sites loaded` : 'Loading data'}
-</div>
-
-<p>TEAM HAYABUSA</p>
-</div>
-
-
+<h1>Hayabusa lunar navigator</h1>
+<p className="status" role="status">
+{loadError ? `Data failed to load: ${loadError}` : data ? `${data.sites.length} sites loaded. Sun ${lit ? 'in view' : 'hidden'} at the selected hour.` : 'Loading data'}
+</p>
 </header>
-<div className="mission-toolbar">
-<div className="toolbar-control">
-<label htmlFor="landing-site">Site:</label>
-<select
-id = "landing-site"
-value={selectedSite}
-onChange={(event) => setSelectedSite(event.target.value)}
-disabled={!data}
->
-{data && data.sites.map((s) => (
-<option key={s.id} value={s.id}>{s.name}</option>
-))}
-</select>
-{site && (
-<span className="site-note" title="Horizons are computed in advance from terrain maps for each listed point, so custom coordinates are not available.">
-{formatLatLon(site.lat, site.lon)}. Fixed points only, computed in advance from terrain maps.
-</span>
-)}
-</div>
-<div className="toolbar-control">
-<label htmlFor="landing-date">Landing (UTC):</label>
-<input
-id="landing-date"
-type="datetime-local"
-step={3600}
-value={data ? toInputValue(landingMs) : selectedDate}
-min={data ? toInputValue(dataStartMs) : undefined}
-max={data ? toInputValue(latestLandingMs) : undefined}
-onChange={(event) => event.target.value && setSelectedDate(event.target.value)}
-disabled={!data}
-/>
-</div>
-<div className="toolbar-control">
-<label htmlFor="mission-duration">Mission Duration (days):</label>
-<select
-id="mission-duration"
-value={missionDuration}
-onChange={(event) => setSelectedMissionDuration(Number(event.target.value))
-}
->
-<option value={1}>1 Day</option>
-<option value={7}>7 Days</option>
-<option value={14}>14 Days</option>
-<option value={28}>28 Days</option>
-<option value={30}>30 Days</option>
-</select>
-</div>
 
-<div className="toolbar-control">
-<label htmlFor="mast-height">Mast Height (meters):</label>
-<select 
-id="mast-height"
-value={mastHeight}
-onChange={(event) => setSelectedMastHeight(event.target.value)
-}
->
-<option value="">1 m</option>
-<option value="5m">5 m</option>
-</select>
+<section className="sky-block" aria-labelledby="sky-title">
+<div className="block-heading">
+<h2 id="sky-title">Sky from {site ? site.name : 'the site'}</h2>
+<p className="note">Terrain horizon for a {mastHeight === '5m' ? '5 m' : '1 m'} mast, from LOLA elevation maps.</p>
 </div>
-<button className="compare-button" onClick={handleCompare}
-disabled={!data || scenarios.length >= MAX_SCENARIOS}
-title={scenarios.length >= MAX_SCENARIOS ? `Up to ${MAX_SCENARIOS} scenarios; remove one to add another` : 'Add these settings to the comparison'}>
-+ Compare{scenarios.length ? ` (${scenarios.length}/${MAX_SCENARIOS})` : ''}
-</button>
-</div>
-
-<div className="dashboard-layout">
-
-<div className="left-column">
-
-<section className="verdict">
-<div className="section-heading">
-<h2>Mission Verdict</h2>
-<span className={`verdict-status ${verdict ? (verdict.pass ? 'status-pass' : 'status-fail') : ''}`}>
-{verdict ? (verdict.pass ? 'Pass' : 'Fail') : 'Awaiting Analysis'}
-</span>
-</div>
-{verdict ? (
-<Verdict result={verdict} req={requirements} onReqChange={setRequirements} site={site} />
-) : (
-<p>Loading data</p>
-)}
-</section>
-
-<section className="metrics">
-<h2>Mission Metrics</h2>
-<div className="metrics-grid">
-<div className="metric-card">
-<p>Sunlit Time</p>
-<h3>{summary ? formatPct(summary.sunShare) : '--%'}</h3>
-<span>Average share of the Sun's disc in view</span>
-</div>
-<div className="metric-card">
-<p>Earth Visibility</p>
-<h3>{summary ? formatPct(summary.earthShare) : '--%'}</h3>
-<span>Of mission duration, Earth at least half in view</span>
-</div>
-<div className="metric-card">
-<p>Sun and Earth Together</p>
-<h3>{summary ? formatPct(summary.bothShare) : '--%'}</h3>
-<span>Power and direct contact at the same time</span>
-</div>
-<div className="metric-card">
-<p>Longest Darkness</p>
-<h3>{summary ? formatHours(summary.longestDarkHours) : '-- hrs'}</h3>
-<span>{summary ? formatDays(summary.longestDarkHours) : ''}Continuous time without sunlight</span>
-</div>
-<div className="metric-card">
-<p>Longest Comms Gap</p>
-<h3>{summary ? formatHours(summary.longestCommsGapHours) : '-- hrs'}</h3>
-<span>{summary ? formatDays(summary.longestCommsGapHours) : ''}Continuous time without Earth in view</span>
-</div>
-</div>
-</section>
-
-<section className="metrics">
-<h2>Next Change</h2>
 {site && range ? (
+<>
+<SkyView site={site} mast={mastHeight} range={range} index={timeIndex} />
+<p className="legend">
+<span className="key key-sun" aria-hidden="true" /> Sun and its path.{' '}
+<span className="key key-earth" aria-hidden="true" /> Earth and its path.{' '}
+A dashed circle marks a body hidden behind the terrain.
+</p>
+<div className="time-controls">
+<button type="button" className="button" onClick={togglePlay}
+aria-label={playing ? 'Pause' : 'Play through the mission'}>
+{playing ? 'Pause' : 'Play'}
+</button>
+<span className="time-label">{timeLabel}</span>
+</div>
+<input className="time-slider" type="range" min={range.from} max={range.to - 1} step={1} value={timeIndex}
+onChange={(event) => jumpTo(Number(event.target.value))}
+aria-label="Time within the mission" aria-valuetext={timeLabel} />
+<Timeline
+sunVis={series(site, 'sun', mastHeight)}
+earthVis={series(site, 'earth', mastHeight)}
+range={range}
+index={timeIndex}
+stepHours={data.meta.step_hours}
+onIndexChange={jumpTo}
+/>
+<p className="legend">
+<span className="key key-sun" aria-hidden="true" /> At least half the Sun in view.{' '}
+<span className="key key-sun-partial" aria-hidden="true" /> Part of the Sun in view.{' '}
+<span className="key key-earth" aria-hidden="true" /> At least half of Earth in view. Select a bar to jump to that hour.
+</p>
+<div className="now">
 <Countdown
 site={site}
 mast={mastHeight}
@@ -271,95 +183,98 @@ range={range}
 stepHours={data.meta.step_hours}
 startMs={dataStartMs}
 />
-) : null}
-<p className="panel-note">From the time selected in the sky view or timeline: {timeLabel}</p>
-</section>
+<Closeups site={site} mast={mastHeight} index={timeIndex} />
 </div>
-
-<div className="right-column">
-<section className="sky-view">
-<div className="section-heading">
-<h2>Sky View</h2>
-<span className="verdict-status">Terrain horizon, {mastHeight === '5m' ? '5 m' : '1 m'} mast</span>
-</div>
-{site && range ? (
-<SkyView
-site={site}
-mast={mastHeight}
-range={range}
-index={timeIndex}
-timeLabel={timeLabel}
-playing={playing}
-onTogglePlay={togglePlay}
-onIndexChange={(i) => {
-setPlaying(false)
-setTimeOffset(i - range.from)
-}}
-/>
+</>
 ) : (
-<div className="sky-display" />
+<div className="sky-placeholder" />
 )}
-
-<div className="sky-legend">
-<span className="legend-sun">Sun and its path</span>
-<span className="legend-earth">Earth and its path</span>
-<span>Line: terrain horizon from LOLA elevation maps</span>
-<span>Close-ups are at true angular size</span>
-</div>
-
-
 </section>
 
-<section className="timeline">
-<div className="section-heading">
-<h2>Mission Timeline</h2>
-<span className="verdict-status">{missionDuration} {missionDuration === 1 ? 'day' : 'days'}, hourly</span>
-</div>
-{site && range ? (
-<Timeline
-sunVis={series(site, 'sun', mastHeight)}
-earthVis={series(site, 'earth', mastHeight)}
-range={range}
-index={timeIndex}
-stepHours={data.meta.step_hours}
-onIndexChange={(i) => {
-setPlaying(false)
-setTimeOffset(i - range.from)
-}}
+<div className="lower">
+
+<aside className="controls" aria-label="Mission settings">
+<label className="field">
+<span>Site</span>
+<select
+value={selectedSite}
+onChange={(event) => setSelectedSite(event.target.value)}
+disabled={!data}
+>
+{data && data.sites.map((s) => (
+<option key={s.id} value={s.id}>{s.name}</option>
+))}
+</select>
+</label>
+{site && (
+<p className="note">
+{formatLatLon(site.lat, site.lon)}. Fixed points only: horizons are computed in advance from terrain maps, so custom coordinates are not available.
+</p>
+)}
+<label className="field">
+<span>Landing time (UTC)</span>
+<input
+type="datetime-local"
+step={3600}
+value={data ? toInputValue(landingMs) : selectedDate}
+min={data ? toInputValue(dataStartMs) : undefined}
+max={data ? toInputValue(latestLandingMs) : undefined}
+onChange={(event) => event.target.value && setSelectedDate(event.target.value)}
+disabled={!data}
 />
-) : null}
-<div className="sky-legend">
-<span className="legend-sun">Sun at least half in view</span>
-<span className="legend-sun-partial">Sun partly in view</span>
-<span className="legend-earth">Earth at least half in view</span>
-<span>Click a bar to jump to that hour</span>
-</div>
+</label>
+<label className="field">
+<span>Mission length</span>
+<select
+value={missionDuration}
+onChange={(event) => setSelectedMissionDuration(Number(event.target.value))}
+>
+<option value={1}>1 day</option>
+<option value={7}>7 days</option>
+<option value={14}>14 days</option>
+<option value={28}>28 days</option>
+<option value={30}>30 days</option>
+</select>
+</label>
+<label className="field">
+<span>Mast height</span>
+<select
+value={mastHeight}
+onChange={(event) => setSelectedMastHeight(event.target.value)}
+>
+<option value="">1 m</option>
+<option value="5m">5 m</option>
+</select>
+</label>
+<button type="button" className="button" onClick={handleCompare}
+disabled={!data || scenarios.length >= MAX_SCENARIOS}>
+Add to comparison ({scenarios.length} of {MAX_SCENARIOS})
+</button>
+<Requirements req={requirements} onChange={setRequirements} />
+</aside>
+
+<div className="results">
+
+<section aria-labelledby="metrics-title">
+<h2 id="metrics-title">Mission metrics</h2>
+{summary ? (
+<dl className="metrics">
+<Metric value={formatPct(summary.sunShare)} unit="%" label="Sunlit, average share of the Sun's disc" />
+<Metric value={formatPct(summary.earthShare)} unit="%" label="Earth in view" />
+<Metric value={formatPct(summary.bothShare)} unit="%" label="Sun and Earth together" />
+<Metric value={summary.longestDarkHours} unit="h" label={`Longest darkness, ${(summary.longestDarkHours / 24).toFixed(1)} days`} />
+<Metric value={summary.longestCommsGapHours} unit="h" label={`Longest comms gap, ${(summary.longestCommsGapHours / 24).toFixed(1)} days`} />
+</dl>
+) : (
+<p className="note">Loading data</p>
+)}
 </section>
 
-</div>
-</div>
+{verdict ? <Verdict result={verdict} req={requirements} site={site} /> : null}
 
-<section className="compare-section">
-<div className="section-heading">
-<h2>Compare Scenarios</h2>
-<span className="verdict-status">Same requirements for every card</span>
-</div>
-{data ? (
-<Compare
-data={data}
-scenarios={scenarios}
-req={requirements}
-max={MAX_SCENARIOS}
-onRemove={(key) => setScenarios(scenarios.filter((sc) => sc.key !== key))}
-/>
-) : null}
-</section>
-
-<section className="compare-section">
-<div className="section-heading">
-<h2>Landing Calendar{site ? `: ${site.name}` : ''}</h2>
-<span className="verdict-status">{missionDuration} {missionDuration === 1 ? 'day' : 'days'}, {mastHeight === '5m' ? '5 m' : '1 m'} mast</span>
-</div>
+<section aria-labelledby="calendar-title">
+<h2 id="calendar-title">Landing calendar{site ? ` for ${site.name}` : ''}</h2>
+<p className="note">{missionDuration} {missionDuration === 1 ? 'day' : 'days'}, {mastHeight === '5m' ? '5 m' : '1 m'} mast, current requirements.</p>
 {site ? (
 <Calendar
 meta={data.meta}
@@ -378,8 +293,24 @@ setSelectedDate(`${date}T00:00`)
 ) : null}
 </section>
 
-</main>
+<section aria-labelledby="compare-title">
+<h2 id="compare-title">Compare scenarios</h2>
+<p className="note">Every scenario uses the current requirements.</p>
+{data ? (
+<Compare
+data={data}
+scenarios={scenarios}
+req={requirements}
+max={MAX_SCENARIOS}
+onRemove={(key) => setScenarios(scenarios.filter((sc) => sc.key !== key))}
+/>
+) : null}
+</section>
 
+</div>
+</div>
+
+</main>
 )
- }
- export default App
+}
+export default App
