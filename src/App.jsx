@@ -1,22 +1,40 @@
 import {useState} from 'react'
-import 'App.css'
+import './App.css'
 
 function App() {
 
-const [selectedSite, setSelectedSite] = useState('Shackelton Crater')
+const [selectedSite, setSelectedSite] = useState('Shacklton Crater')
 const [selectedDate, setSelectedDate] = useState('')
 const [missionDuration, setSelectedMissionDuration] = useState(7)
 const [mastHeight, setSelectedMastHeight] = useState(2)
 
 return (
-<main className="Dashboard">
+<main className="dashboard">
 
 <header className="topbar">
 <div className="brand">
 
+<div className="logo">
+X
+</div>
+
+<div className="brand-text">
 <h1>Lunar Navigator</h1>
 <p> Mission Planning System</p>
 </div>
+
+</div>
+
+<div className="tobbar-information">
+
+<div className="system-status">
+System Ready
+</div>
+
+<p>TEAM HAYABUSA</p>
+</div>
+
+
 </header>
 
 <section className="configuration">
@@ -25,7 +43,7 @@ return (
 
 </section>
 
-<section className="Verdict">
+<section className="verdict">
 <h2>Mission Verdict</h2>
 </section>
 
