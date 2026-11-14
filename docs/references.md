@@ -30,3 +30,5 @@
 - Ginsburg, A. et al. (2019). astroquery: an astronomical web-querying package in Python. *Astronomical Journal* 157, 98. doi:10.3847/1538-3881/aafc33
 - Harris, C. R. et al. (2020). Array programming with NumPy. *Nature* 585, 357 to 362. doi:10.1038/s41586-020-2649-2
 - rasterio, https://github.com/rasterio/rasterio ; pyproj, https://github.com/pyproj4/pyproj ; Matplotlib (Hunter, J. D. (2007), *Computing in Science and Engineering* 9, 90 to 95)
+- React, https://react.dev ; Vite, https://vite.dev
+- Archivo typeface by Omnibus-Type, SIL Open Font License 1.1, https://github.com/Omnibus-Type/Archivo (licence copied to `web/public/fonts/OFL.txt`)

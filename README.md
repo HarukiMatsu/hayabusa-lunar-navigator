@@ -1,6 +1,8 @@
-# Lunar Landing Site Navigator
+# Hayabusa lunar navigator
 
 Team Hayabusa, NASA Space Apps Challenge 2026 (London).
+
+Live app: https://harukimatsu.github.io/hayabusa-lunar-navigator/
 
 Pick a lunar landing site and a date and see, hour by hour, whether the Sun and Earth are above the local terrain horizon. That tells you when a lander has solar power and when it can talk directly to Earth, so you can compare sites and dates quickly, for example after a launch slips.
 
@@ -20,6 +22,19 @@ The Python pipeline writes everything to one file, `web/data/visibility.json`, w
 ## Results are checked
 
 Our numbers are compared with JPL Horizons, with hand calculations, with the published illumination results of Barker et al. (2021) and with Diviner equatorial temperatures. See [docs/validation/summary.md](docs/validation/summary.md) for the table and plots.
+
+## Running the web app
+
+The app is in `web/` (React and Vite). It needs Node.js 22 or newer.
+
+```bash
+cd web
+npm ci
+npm run dev        # http://localhost:5173
+npm run build      # writes web/dist for publishing
+```
+
+Every push to `main` builds `web/` and publishes it to GitHub Pages (`.github/workflows/deploy-pages.yml`). The app reads `web/data/visibility.json`, which is bundled into the build. The Archivo font is stored in `web/public/fonts/`, so the app works without an internet connection once loaded.
 
 ## Running the pipeline
 
