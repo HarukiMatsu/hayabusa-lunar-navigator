@@ -59,30 +59,37 @@ def horizon(tiers, lat_deg, lon_deg, ground_m, masts_m=(1.0, 5.0), with_source=F
     """Horizon for each mast height.
 
     tiers: list of (dem, step_m, max_m) or (dem, step_m, max_m, min_m),
-    nearest first. Along each ray, tier k is used only beyond the distance
-    where the earlier tiers last had data (and beyond min_m if given).
+    nearest first (finest first). A sample from tier k is used only where no
+    earlier tier has data at that point, so a coarser map fills every gap in
+    the finer ones, including gaps between them (e.g. between the Site23
+    tile and the mosaic).
 
     Returns {mast: 720 angles in degrees}; with_source=True also returns
     {mast: index of the tier that set the horizon in each direction}.
     """
     best = {m: np.full(N_AZ, -np.inf) for m in masts_m}
     src = {m: np.full(N_AZ, -1) for m in masts_m}
-    reach = np.zeros(N_AZ)  # how far the tiers so far have data, per ray
+    spans = []
     for k, tier in enumerate(tiers):
         dem, step, max_m = tier[:3]
         min_m = tier[3] if len(tier) > 3 else 0.0
         d = np.arange(min_m + step, max_m + step, step)
-        h = tier_heights(dem, lat_deg, lon_deg, d)
-        h = np.where(d[None, :] > reach[:, None], h, np.nan)
+        plat, plon = ray_latlon(lat_deg, lon_deg, d)
+        x, y = dem.xy(plat, plon)
+        h = dem.height(np.asarray(x), np.asarray(y))
+        for dem_j, lo_j, hi_j in spans:     # drop points an earlier tier covers
+            xj, yj = dem_j.xy(plat, plon)
+            covered = np.isfinite(dem_j.height(np.asarray(xj), np.asarray(yj)))
+            covered &= (d[None, :] > lo_j) & (d[None, :] <= hi_j)
+            h = np.where(covered, np.nan, h)
+        spans.append((dem, min_m, max_m))
         has = np.isfinite(h)
-        last = np.where(has.any(axis=1), d[has.shape[1] - 1 - np.argmax(has[:, ::-1], axis=1)], 0.0)
         for m in masts_m:
             el = np.where(has, elevation_angle(d[None, :], h, ground_m + m), -np.inf)
             tmax = el.max(axis=1)
             better = tmax > best[m]
             best[m] = np.where(better, tmax, best[m])
             src[m] = np.where(better, k, src[m])
-        reach = np.maximum(reach, last)
     out = {m: np.where(np.isfinite(best[m]), best[m], NO_TERRAIN) for m in masts_m}
     return (out, src) if with_source else out
 

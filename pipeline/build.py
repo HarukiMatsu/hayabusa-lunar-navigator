@@ -34,12 +34,27 @@ def far_tiers():
     return [(mosaic_dem(16), 40.0, 150000.0), (polar_dem(), 120.0, 300000.0)]
 
 # Each site is a single point on its PGDA map, given in map metres.
-# Site01: centroid of Barker et al. (2021) Site 1 region of interest 1.
+# Where Barker et al. (2021) give regions of interest (RoIs, regions with
+# average illumination over 70% at 1 m), we use RoI 1's reference point from
+# the RoI shapefile table (raw/dem/<site>_ROIs.tgz; terrain.read_rois).
+# Site23 has no RoIs; we use the Malapert summit, the highest pixel in the
+# tile (5173.6 m). The tile centre sits on the massif's flank below a small
+# crest and gets only 15% sunlit at 1 m, so it does not represent the site.
 SITES = [
     {"id": "site01", "name": "Site01 Connecting ridge", "dem": "Site01",
      "x": -11582.5, "y": -12462.5,
-     "source": "Barker et al. (2021), Site 1 RoI 1 centroid"},
+     "source": "Barker et al. (2021), Site 1 RoI 1"},
+    {"id": "site04", "name": "Site04 Shackleton rim", "dem": "Site04",
+     "x": -2812.5, "y": -6647.5,
+     "source": "Barker et al. (2021), Site 4 RoI 1"},
+    {"id": "site11", "name": "Site11 de Gerlache rim", "dem": "Site11",
+     "x": -37542.5, "y": 14882.5,
+     "source": "Barker et al. (2021), Site 11 RoI 1"},
+    {"id": "site23", "name": "Site23 Malapert massif", "dem": "Site23",
+     "x": 4392.5, "y": 121637.5,
+     "source": "Highest point of PGDA Site23 tile (Malapert summit)"},
 ]
+TIER_NAMES = ("tile", "mosaic", "polar")
 
 
 def r2(a):
@@ -55,7 +70,7 @@ def build_site(site, ets, sun_km, earth_km):
     dem = site_dem(site["dem"])
     x, y = site["x"], site["y"]
     lat, lon = dem.latlon(x, y)
-    ground, hor = hz.site_horizon(dem, x, y, masts_m=MASTS, far=far_tiers())
+    ground, hor, src = hz.site_horizon(dem, x, y, masts_m=MASTS, far=far_tiers(), with_source=True)
     slope, facing = dem.slope(x, y)
     sky = eph.site_sky(lat, lon, ground + MASTS[0], ets, sun_km, earth_km)
 
@@ -79,6 +94,9 @@ def build_site(site, ets, sun_km, earth_km):
         "ground_temp_k": [None] * len(ets),  # filled in step 6 (thermal.py)
     }
     stats = {m: vis.summary(*frac[m], STEP_HOURS) for m in MASTS}
+    for m in MASTS:
+        stats[m]["tiers"] = ", ".join(f"{n} {int(np.sum(src[m] == k))}" for k, n in enumerate(TIER_NAMES))
+        stats[m]["no_terrain"] = int(np.sum(hor[m] == hz.NO_TERRAIN))
     return entry, stats
 
 
@@ -100,6 +118,7 @@ def main():
                   f"Earth visible {st['earth_pct']:.1f}%, "
                   f"longest blackout {st['longest_blackout_h'] / 24:.1f} d, "
                   f"both {st['both_pct']:.1f}%")
+            print(f"           azimuths set by {st['tiers']}; no terrain {st['no_terrain']}")
 
     data = {"meta": {"start_utc": START_UTC, "step_hours": STEP_HOURS, "n_steps": N_STEPS},
             "sites": sites}

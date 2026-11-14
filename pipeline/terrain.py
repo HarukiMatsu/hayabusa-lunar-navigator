@@ -154,3 +154,55 @@ def mosaic_dem(factor=16):
         level = {2: 0, 4: 1, 8: 2, 16: 3}[factor]
         _mosaic_cache[factor] = Dem.open(MOSAIC, overview_level=level)
     return _mosaic_cache[factor]
+
+
+def read_rois(site):
+    """Barker et al. (2021) regions of interest for a site, read straight from
+    the shapefile (polygon records) and its .dbf table. Returns a list of
+    {attributes..., "area_m2", "cx", "cy"} with the area weighted polygon
+    centroid in map metres."""
+    import struct
+    base = DEM_DIR / "rois" / site / f"{site}_ROIs"
+    # .dbf attribute table
+    raw = (base.with_suffix(".dbf")).read_bytes()
+    n_rec, hdr_len, rec_len = struct.unpack("<IHH", raw[4:12])
+    fields, pos = [], 32
+    while raw[pos] != 0x0D:
+        name = raw[pos:pos + 11].split(b"\0")[0].decode()
+        fields.append((name, raw[pos + 16]))
+        pos += 32
+    rows = []
+    for i in range(n_rec):
+        rec = raw[hdr_len + i * rec_len + 1: hdr_len + (i + 1) * rec_len]
+        row, p = {}, 0
+        for name, flen in fields:
+            v = rec[p:p + flen].decode(errors="replace").strip()
+            try:
+                v = float(v)
+            except ValueError:
+                pass
+            row[name] = v
+            p += flen
+        rows.append(row)
+    # .shp polygons
+    shp = (base.with_suffix(".shp")).read_bytes()
+    pos, k = 100, 0
+    while pos < len(shp):
+        _, length = struct.unpack(">ii", shp[pos:pos + 8])
+        c = shp[pos + 8: pos + 8 + 2 * length]
+        pos += 8 + 2 * length
+        if struct.unpack("<i", c[:4])[0] != 5:
+            continue
+        n_parts, n_pts = struct.unpack("<ii", c[36:44])
+        parts = list(struct.unpack(f"<{n_parts}i", c[44:44 + 4 * n_parts])) + [n_pts]
+        pts = np.frombuffer(c[44 + 4 * n_parts: 44 + 4 * n_parts + 16 * n_pts], "<f8").reshape(-1, 2)
+        A = cx = cy = 0.0
+        for a, b in zip(parts[:-1], parts[1:]):
+            x, y = pts[a:b, 0], pts[a:b, 1]
+            cr = x[:-1] * y[1:] - x[1:] * y[:-1]
+            A += cr.sum() / 2
+            cx += ((x[:-1] + x[1:]) * cr).sum() / 6
+            cy += ((y[:-1] + y[1:]) * cr).sum() / 6
+        rows[k].update(area_m2=abs(A), cx=cx / A, cy=cy / A)
+        k += 1
+    return rows
