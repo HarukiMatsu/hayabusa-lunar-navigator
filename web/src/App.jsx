@@ -1,7 +1,19 @@
 import {useEffect, useState} from 'react'
 import './App.css'
 import visibilityUrl from '../data/visibility.json?url'
-import {missionRange} from './model.js'
+import {missionRange, summarise} from './model.js'
+
+function formatPct(share) {
+return `${(100 * share).toFixed(1)}%`
+}
+
+function formatHours(hours) {
+return `${hours} hrs`
+}
+
+function formatDays(hours) {
+return `${(hours / 24).toFixed(1)} days. `
+}
 
 // "YYYY-MM-DDTHH:MM" in UTC, the format a datetime-local input uses.
 function toInputValue(ms) {
@@ -49,6 +61,7 @@ const landingMs = data
 : 0
 const landingIso = data ? new Date(landingMs).toISOString() : ''
 const range = data ? missionRange(data.meta, landingIso, missionDuration) : null
+const summary = site && range ? summarise(site, range, data.meta.step_hours, mastHeight) : null
 
 const handleCompare = () => {
 console.log("Comparing mission settings:", {
@@ -174,18 +187,28 @@ Compare to evaluate the conditions
 <div className="metrics-grid">
 <div className="metric-card">
 <p>Sunlit Time</p>
-<h3>--%</h3>
-<span>Of mission duration</span>
-</div>
-<div className="metric-card">
-<p>Longest Darkness</p>
-<h3>-- hrs</h3>
-<span>Continuous time without sunlight</span>
+<h3>{summary ? formatPct(summary.sunShare) : '--%'}</h3>
+<span>Average share of the Sun's disc in view</span>
 </div>
 <div className="metric-card">
 <p>Earth Visibility</p>
-<h3>--%</h3>
-<span>Of mission duration</span>
+<h3>{summary ? formatPct(summary.earthShare) : '--%'}</h3>
+<span>Of mission duration, Earth at least half in view</span>
+</div>
+<div className="metric-card">
+<p>Sun and Earth Together</p>
+<h3>{summary ? formatPct(summary.bothShare) : '--%'}</h3>
+<span>Power and direct contact at the same time</span>
+</div>
+<div className="metric-card">
+<p>Longest Darkness</p>
+<h3>{summary ? formatHours(summary.longestDarkHours) : '-- hrs'}</h3>
+<span>{summary ? formatDays(summary.longestDarkHours) : ''}Continuous time without sunlight</span>
+</div>
+<div className="metric-card">
+<p>Longest Comms Gap</p>
+<h3>{summary ? formatHours(summary.longestCommsGapHours) : '-- hrs'}</h3>
+<span>{summary ? formatDays(summary.longestCommsGapHours) : ''}Continuous time without Earth in view</span>
 </div>
 </div>
 </section>
