@@ -1,9 +1,32 @@
-import {useState} from 'react'
+import {useEffect, useState} from 'react'
 import './App.css'
+import visibilityUrl from '../data/visibility.json?url'
+
+function formatLatLon(lat, lon) {
+return `${Math.abs(lat).toFixed(2)}°${lat < 0 ? 'S' : 'N'}, ${Math.abs(lon).toFixed(2)}°${lon < 0 ? 'W' : 'E'}`
+}
 
 function App() {
 
-const [selectedSite, setSelectedSite] = useState('Shackleton Crater')
+// The whole dataset: { meta, sites }. Loaded once from web/data/visibility.json.
+const [data, setData] = useState(null)
+const [loadError, setLoadError] = useState('')
+const [selectedSite, setSelectedSite] = useState('')
+
+useEffect(() => {
+fetch(visibilityUrl)
+.then((response) => {
+if (!response.ok) throw new Error(`HTTP ${response.status}`)
+return response.json()
+})
+.then((json) => {
+setData(json)
+setSelectedSite(json.sites[0].id)
+})
+.catch((error) => setLoadError(String(error)))
+}, [])
+
+const site = data ? data.sites.find((s) => s.id === selectedSite) : null
 const [selectedDate, setSelectedDate] = useState('')
 const [missionDuration, setSelectedMissionDuration] = useState(14)
 const [mastHeight, setSelectedMastHeight] = useState(2)
@@ -36,7 +59,7 @@ X
 <div className="topbar-information">
 
 <div className="system-status">
-System Ready
+{loadError ? `Data failed to load: ${loadError}` : data ? `${data.sites.length} sites loaded` : 'Loading data'}
 </div>
 
 <p>TEAM HAYABUSA</p>
@@ -51,11 +74,17 @@ System Ready
 id = "landing-site"
 value={selectedSite}
 onChange={(event) => setSelectedSite(event.target.value)}
+disabled={!data}
 >
-<option value="Shackleton Crater">Shackleton Crater</option>
-<option value="de Gerlache Crater">de Gerlache Crater</option>
-<option value="Connecting Ridge">Connecting Ridge</option>
+{data && data.sites.map((s) => (
+<option key={s.id} value={s.id}>{s.name}</option>
+))}
 </select>
+{site && (
+<span className="site-note" title="Horizons are computed in advance from terrain maps for each listed point, so custom coordinates are not available.">
+{formatLatLon(site.lat, site.lon)}. Fixed points only, computed in advance from terrain maps.
+</span>
+)}
 </div>
 <div className="toolbar-control">
 <label htmlFor="mission-duration">Mission Duration (days):</label>
