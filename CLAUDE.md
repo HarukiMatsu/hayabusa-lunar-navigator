@@ -348,6 +348,8 @@ Record anything learned (conventions, gotchas, timings) in section 12 below so S
 - Practice task 6 (far field test) was written but never run before the event started.
 - `spice.str2et` rejects ISO "T" strings with a trailing " UTC"; pass `2027-01-01T00:00:00` alone (ISO is read as UTC).
 - Step 1 check (14 Nov, `python -m pipeline.validate horizons`, Site01 high point, 1440 h from 1 Jan 2027): max differences vs azlcpo 0.000026 deg, vs Horizons 0.000033 deg. Sun el -0.80 to 1.53 deg, Earth el -7.55 to 6.19 deg, Earth angular radius 0.90 to 1.02 deg.
+- Step 2 check (14 Nov). Synthetic flat map with blocks: `horizon.py` matches the hand formula to 0.0002 deg (the gap is the small-angle approximation in the hand formula; the code uses the exact sphere form). Site01 high point, tile only, 720 rays in 5 m steps, 1.5 s for both masts: 1 m min -3.66, max -0.45 (az 184.5), mean -2.14; 5 m min -4.84, max -0.87, mean -3.15. Below the sphere dip in 39% (1 m) and 67% (5 m) of directions, so the far field is missing there.
+- On a summit the 5 m horizon is lower than the 1 m one everywhere, by up to about 1.5 deg. At 1 m the highest angles come from the summit's own shoulders tens of metres away; a 4 m higher mast looks over them. The two curves meet where a distant ridge sets the horizon (az 70 to 80).
 - (add more here)
 
 ---
