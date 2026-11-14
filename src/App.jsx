@@ -70,6 +70,37 @@ sunlitPercentage >= 70 &&
 ) {
   verdict = "viable"
 }
+const rankedSites = visibilityData.sites.map((site) => {
+const siteSunHours = expandRuns(site.sun).slice(0, hoursToAnalyse)
+const siteEarthHours = expandRuns(site.earth).slice(0, hoursToAnalyse)
+
+const siteSunlit = calculateSunlitPercentage(siteSunHours)
+const siteDarkness = calculateLongestDarkness(siteSunHours)
+const siteEarthVisiblity = calculateEarthVisibilityPercentage(siteEarthHours)
+
+let siteVerdict = "Marginal"
+if(siteSunlit < 50 || siteDarkness > 96) {
+siteVerdict = "No Go"
+}
+else if (
+siteSunlit >= 70 && 
+siteDarkness <= 48 && 
+siteEarthVisiblity >=50
+){
+siteVerdict = "Visible"
+}
+return {
+name: site.name,
+sunlit: siteSunlit,
+darkness: siteDarkness,
+earthVisibility: siteEarthVisiblity,
+verdict: siteVerdict
+}
+}).sort((a, b) => {
+const priority = {"Viable" : 0, "Marginal" : 1, "No Go" : 2}
+return priority[a.verdict] - priority[b.verdict] ||
+b.sunlit - a.sunlit || a.darkness - b.darkness || b.earthVisibility - a.earthVisibility
+})
 
 
 const handleCompare = () => {
