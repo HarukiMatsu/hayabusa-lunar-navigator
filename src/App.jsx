@@ -1,12 +1,64 @@
 import {useState} from 'react'
 import './App.css'
+import visibilityData from './data/sample_visibility.json'
+
+function expandRuns(runs) {
+return runs.flatMap((item)=> {
+if (Array.isArray(item)) {
+const [value, count] = item
+return Array(count).fill(value)
+}
+return [item]
+})
+}
+
+function calculateSunlitPercentage(sunHours) {
+const sunlitHours = sunHours.filter(value => value > 0).length
+return (sunlitHours / sunHours.length) * 100
+}
+
+
+function calculateLongestDarkness(sunHours) {
+let longestDarkness = 0
+let currentDarkness = 0
+
+sunHours.forEach((value) => {
+if (value === 0) {
+currentDarkness++
+longestDarkness = Math.max(longestDarkness, currentDarkness)
+}
+else {
+currentDarkness = 0
+}
+})
+return longestDarkness
+}
+
+function calculateEarthVisibilityPercentage(earthHours) {
+const totalvisiblity = earthHours.reduce(
+(total, value) => total + value,
+0
+)
+return (totalvisiblity / earthHours.length) * 100
+}
+
 
 function App() {
 
-const [selectedSite, setSelectedSite] = useState('Shackleton Crater')
+const [selectedSite, setSelectedSite] = useState('malapert_massif')
 const [selectedDate, setSelectedDate] = useState('')
 const [missionDuration, setSelectedMissionDuration] = useState(14)
 const [mastHeight, setSelectedMastHeight] = useState(2)
+const siteData = visibilityData.sites.find(
+(site) => site.id === selectedSite
+)
+const hoursToAnalyse = missionDuration * 24
+const sunHours = expandRuns(siteData.sun).slice(0, hoursToAnalyse)
+const earthHours = expandRuns(siteData.earth).slice(0, hoursToAnalyse)
+const sunlitPercentage = calculateSunlitPercentage(sunHours)
+const longestDarkness = calculateLongestDarkness(sunHours)
+const earthVisibility = calculateEarthVisibilityPercentage(earthHours)
+
 const handleCompare = () => {
 console.log("Comparing mission settings:", {
 selectedSite,
@@ -52,9 +104,10 @@ id = "landing-site"
 value={selectedSite}
 onChange={(event) => setSelectedSite(event.target.value)}
 >
-<option value="Shackleton Crater">Shackleton Crater</option>
-<option value="de Gerlache Crater">de Gerlache Crater</option>
-<option value="Connecting Ridge">Connecting Ridge</option>
+<option value="malapert_massif">Malapert Massif</option>
+<option value="haworth">Haworth</option>
+<option value="de_gerlache_rim_2">de Gerlache Rim 2</option>
+<option value="nobile_rim_1">Nobile Rim 1</option>
 </select>
 </div>
 <div className="toolbar-control">
@@ -109,22 +162,22 @@ Select your landing site and mission settings, then click
 Compare to evaluate the conditions
 </p>
 </section>
-
-<section className="metrics">
+<section className= "metrics">
 <h2>Mission Metrics</h2>
 <div className="metrics-grid">
+<div className="metric-card">
 <p>Sunlit Time</p>
-<h3>--%</h3>
+<h3>{sunlitPercentage.toFixed(1)}</h3>
 <span>Of mission duration</span>
 </div>
-<div classNam="metric-card">
-<p>Longest Darkness</p>
-<h3>-- hrs</h3>
-<span>Continuous time without sunglight</span>
-
 <div className="metric-card">
-<p>Earths visiblity</p>
-<h3>--%</h3>
+<p>Longest Darkness</p>
+<h3>{longestDarkness}hrs</h3>
+<span>Continuous time without sunlight</span>
+</div>
+<div className="metric-card">
+<p>Earth Visibility</p>
+<h3>{earthVisibility.toFixed(1)}%</h3>
 <span>Of mission duration</span>
 </div>
 </div>
