@@ -1,6 +1,12 @@
 import {useEffect, useState} from 'react'
 import './App.css'
 import visibilityUrl from '../data/visibility.json?url'
+import {missionRange} from './model.js'
+
+// "YYYY-MM-DDTHH:MM" in UTC, the format a datetime-local input uses.
+function toInputValue(ms) {
+return new Date(ms).toISOString().slice(0, 16)
+}
 
 function formatLatLon(lat, lon) {
 return `${Math.abs(lat).toFixed(2)}°${lat < 0 ? 'S' : 'N'}, ${Math.abs(lon).toFixed(2)}°${lon < 0 ? 'W' : 'E'}`
@@ -27,15 +33,30 @@ setSelectedSite(json.sites[0].id)
 }, [])
 
 const site = data ? data.sites.find((s) => s.id === selectedSite) : null
-const [selectedDate, setSelectedDate] = useState('')
+// Landing time as typed in the picker, "YYYY-MM-DDTHH:MM", always read as UTC.
+const [selectedDate, setSelectedDate] = useState('2027-03-01T00:00')
 const [missionDuration, setSelectedMissionDuration] = useState(14)
-const [mastHeight, setSelectedMastHeight] = useState(2)
+// '' is the 1 m mast and '5m' the 5 m mast, matching the field names in the data.
+const [mastHeight, setSelectedMastHeight] = useState('')
+
+// Allowed landing times: the whole mission must fit inside the data.
+const HOUR_MS = 3600000
+const dataStartMs = data ? Date.parse(data.meta.start_utc) : 0
+const dataEndMs = data ? dataStartMs + data.meta.n_steps * data.meta.step_hours * HOUR_MS : 0
+const latestLandingMs = dataEndMs - missionDuration * 24 * HOUR_MS
+const landingMs = data
+? Math.min(Math.max(Date.parse(`${selectedDate}:00Z`) || dataStartMs, dataStartMs), latestLandingMs)
+: 0
+const landingIso = data ? new Date(landingMs).toISOString() : ''
+const range = data ? missionRange(data.meta, landingIso, missionDuration) : null
+
 const handleCompare = () => {
 console.log("Comparing mission settings:", {
 selectedSite,
-selectedDate,
+landingIso,
 missionDuration,
-mastHeight
+mastHeight,
+range
 })
 }
 
@@ -87,6 +108,19 @@ disabled={!data}
 )}
 </div>
 <div className="toolbar-control">
+<label htmlFor="landing-date">Landing (UTC):</label>
+<input
+id="landing-date"
+type="datetime-local"
+step={3600}
+value={data ? toInputValue(landingMs) : selectedDate}
+min={data ? toInputValue(dataStartMs) : undefined}
+max={data ? toInputValue(latestLandingMs) : undefined}
+onChange={(event) => event.target.value && setSelectedDate(event.target.value)}
+disabled={!data}
+/>
+</div>
+<div className="toolbar-control">
 <label htmlFor="mission-duration">Mission Duration (days):</label>
 <select
 id="mission-duration"
@@ -107,15 +141,11 @@ onChange={(event) => setSelectedMissionDuration(Number(event.target.value))
 <select 
 id="mast-height"
 value={mastHeight}
-onChange={(event) => setSelectedMastHeight(Number(event.target.value))
+onChange={(event) => setSelectedMastHeight(event.target.value)
 }
 >
-<option value={1}>1 m</option>
-<option value={2}>2 m</option>
-<option value={3}>3 m</option>
-<option value={4}>4 m</option>
-<option value={5}>5 m</option>
-<option value={10}>10 m</option>
+<option value="">1 m</option>
+<option value="5m">5 m</option>
 </select>
 </div>
 <button className="compare-button" onClick={handleCompare}>
