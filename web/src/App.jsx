@@ -4,6 +4,7 @@ import visibilityUrl from '../data/visibility.json?url'
 import {checkMission, DEFAULT_LANDER, DEFAULT_REQUIREMENTS, missionRange, series, summarise} from './model.js'
 import Verdict from './Verdict.jsx'
 import Compare from './Compare.jsx'
+import Calendar from './Calendar.jsx'
 import SkyView from './SkyView.jsx'
 import Timeline from './Timeline.jsx'
 import Countdown from './Countdown.jsx'
@@ -73,6 +74,7 @@ const [requirements, setRequirements] = useState(DEFAULT_REQUIREMENTS)
 const verdict = site && range
 ? checkMission(site, range, requirements, DEFAULT_LANDER, data.meta.step_hours, mastHeight)
 : null
+
 
 // Selected moment within the mission, as hours after landing. Shared by the
 // sky view, timeline and countdown. Play steps one hour every 60 ms.
@@ -349,6 +351,29 @@ scenarios={scenarios}
 req={requirements}
 max={MAX_SCENARIOS}
 onRemove={(key) => setScenarios(scenarios.filter((sc) => sc.key !== key))}
+/>
+) : null}
+</section>
+
+<section className="compare-section">
+<div className="section-heading">
+<h2>Landing Calendar{site ? `: ${site.name}` : ''}</h2>
+<span className="verdict-status">{missionDuration} {missionDuration === 1 ? 'day' : 'days'}, {mastHeight === '5m' ? '5 m' : '1 m'} mast</span>
+</div>
+{site ? (
+<Calendar
+meta={data.meta}
+site={site}
+requirements={requirements}
+mast={mastHeight}
+year={new Date(dataStartMs).getUTCFullYear()}
+selectedDay={landingIso.slice(0, 10)}
+missionDays={missionDuration}
+onPick={(date) => {
+setPlaying(false)
+setTimeOffset(0)
+setSelectedDate(`${date}T00:00`)
+}}
 />
 ) : null}
 </section>
