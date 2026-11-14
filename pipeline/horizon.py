@@ -23,18 +23,7 @@ NO_TERRAIN = -90.0  # value for a direction where no terrain sample exists
 
 
 def local_axes(dem: Dem, x, y):
-    """Unit vectors of local north and east on the map, found numerically
-    (nudge latitude, and longitude, and see which way the point moves)."""
-    lat, lon = dem.latlon(x, y)
-    xn, yn = dem.xy(lat + 1e-4, lon)
-    north = np.array([xn - x, yn - y])
-    north /= np.linalg.norm(north)
-    xe, ye = dem.xy(lat, lon + 1e-4)
-    east = np.array([xe - x, ye - y])
-    east /= np.linalg.norm(east)
-    # conformal map: east must be north turned 90 degrees clockwise
-    assert np.allclose(east, [north[1], -north[0]], atol=1e-6), (north, east)
-    return north, east
+    return dem.local_axes(x, y)
 
 
 def elevation_angle(d_m, h_m, h0_m):

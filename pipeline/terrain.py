@@ -74,6 +74,41 @@ class Dem:
              + fr * (1 - fc) * z[r0c + 1, c0c] + fr * fc * z[r0c + 1, c0c + 1])
         return np.where(inside, h, np.nan)
 
+    def local_axes(self, x, y):
+        """Unit vectors of local north and east on the map, found numerically
+        (nudge latitude, then longitude, and see which way the point moves)."""
+        lat, lon = self.latlon(x, y)
+        xn, yn = self.xy(lat + 1e-4, lon)
+        north = np.array([xn - x, yn - y])
+        north /= np.linalg.norm(north)
+        xe, ye = self.xy(lat, lon + 1e-4)
+        east = np.array([xe - x, ye - y])
+        east /= np.linalg.norm(east)
+        # conformal map: east must be north turned 90 degrees clockwise
+        assert np.allclose(east, [north[1], -north[0]], atol=1e-6), (north, east)
+        return north, east
+
+    def slope(self, x, y, half_px=2):
+        """Slope (degrees) and the azimuth the slope faces (downhill direction,
+        degrees clockwise from north), from a least squares plane fitted to the
+        (2 half_px + 1)^2 pixels around the point (default 5 x 5 pixels, 25 m
+        across, roughly lander sized)."""
+        row, col = self.rowcol(x, y)
+        r, c = int(round(float(row))), int(round(float(col)))
+        k = half_px
+        win = self.z[r - k: r + k + 1, c - k: c + k + 1].astype(float)
+        dy_idx, dx_idx = np.mgrid[-k: k + 1, -k: k + 1]
+        A = np.column_stack([dx_idx.ravel() * self.res,          # +x (east on map)
+                             -dy_idx.ravel() * self.res,         # +y (rows go down)
+                             np.ones(win.size)])
+        ok = np.isfinite(win.ravel())
+        (gx, gy, _), *_ = np.linalg.lstsq(A[ok], win.ravel()[ok], rcond=None)
+        slope = float(np.degrees(np.arctan(np.hypot(gx, gy))))
+        north, east = self.local_axes(x, y)
+        down = -np.array([gx, gy])  # map direction of steepest descent
+        facing = float(np.degrees(np.arctan2(down @ east, down @ north)) % 360.0)
+        return slope, facing
+
     def highest_point(self, half_width_m):
         """Highest pixel within a square of +/- half_width_m around the centre."""
         ny, nx = self.z.shape
