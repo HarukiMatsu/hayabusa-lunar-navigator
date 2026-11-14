@@ -59,6 +59,19 @@ const sunlitPercentage = calculateSunlitPercentage(sunHours)
 const longestDarkness = calculateLongestDarkness(sunHours)
 const earthVisibility = calculateEarthVisibilityPercentage(earthHours)
 
+let verdict = "Marginal"
+if (sunlitPercentage < 50 || longestDarkness > 96) {
+verdict = "no go"
+}
+else if (
+sunlitPercentage >= 70 &&
+  longestDarkness <= 48 &&
+  earthVisibility >= 50
+) {
+  verdict = "viable"
+}
+
+
 const handleCompare = () => {
 console.log("Comparing mission settings:", {
 selectedSite,
@@ -154,9 +167,9 @@ onChange={(event) => setSelectedMastHeight(Number(event.target.value))
 <section className="verdict">
 <div className="section-heading">
 <h2>Mission Verdict</h2>
-<span className="verdict-status">Awating Analysis</span>
+<span className="verdict-status">Analysis Complete</span>
 </div>
-<h3>Ready to compare</h3>
+<h3>{verdict}</h3>
 <p>
 Select your landing site and mission settings, then click 
 Compare to evaluate the conditions
@@ -191,15 +204,15 @@ Compare to evaluate the conditions
 <span className="verdict-status">Simulated View</span>
 </div>
 <div className="sky-display">
-<div className="sky-object sun"> </div>
-<div className="sky-object earth"> </div>
+<div className={"sky-object sun ${sunHours[0]>0 ? 'visible' : 'hidden'}"}> </div>
+<div className={"sky-object earth ${earthHours[0]>0 ? 'visible' : 'hidden'"}> </div>
 <div className="horizion"></div>
 <div className="lunar-ground"></div>
 </div>
 
 <div className="sky-legend">
-<span>Sun</span>
-    <span>Earth</span>
+<span>Sun: {sunHours[0] > 0 ? 'Visible' : 'Hidden'}</span>
+  <span>Earth: {earthHours[0] > 0 ? 'Visible' : 'Hidden'}</span>
     <span>— Lunar horizon</span>
 </div>
 
