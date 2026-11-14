@@ -553,3 +553,98 @@ line-height: 1.4;
 grid-template-columns: 1fr;
 }
 }
+
+/* Verdict checks */
+.verdict-status.status-pass {
+background: #1f5f3f;
+color: #c9f5dc;
+}
+.verdict-status.status-fail {
+background: #6b2a2a;
+color: #ffd9d6;
+}
+.check-list {
+list-style: none;
+margin: 12px 0 0;
+padding: 0;
+}
+.check-list li {
+display: grid;
+grid-template-columns: 18px 1fr auto;
+grid-template-areas: "mark name value" "mark limit limit";
+column-gap: 8px;
+padding: 8px 0;
+border-top: 1px solid #293d56;
+font-size: 13px;
+}
+.check-mark {
+grid-area: mark;
+font-weight: 700;
+}
+.check-name {
+grid-area: name;
+}
+.check-value {
+grid-area: value;
+font-weight: 600;
+}
+.check-limit {
+grid-area: limit;
+color: #91a9c7;
+font-size: 11px;
+}
+.check-pass .check-mark {
+color: #5fd39a;
+}
+.check-fail .check-mark,
+.check-fail .check-value {
+color: #ff8a80;
+}
+.visually-hidden {
+position: absolute;
+width: 1px;
+height: 1px;
+overflow: hidden;
+clip: rect(0 0 0 0);
+}
+.cold-report {
+margin-top: 14px;
+font-size: 12px;
+line-height: 1.5;
+color: #c8d6e8;
+}
+.cold-report p {
+margin: 0;
+}
+.requirements {
+margin-top: 14px;
+font-size: 12px;
+}
+.requirements summary {
+cursor: pointer;
+color: #91a9c7;
+}
+.requirements-grid {
+display: grid;
+grid-template-columns: repeat(2, 1fr);
+gap: 10px;
+margin-top: 10px;
+}
+.requirements-grid label {
+display: flex;
+flex-direction: column;
+gap: 4px;
+color: #91a9c7;
+}
+.requirements-grid input {
+padding: 6px;
+}
+.reset-button {
+margin-top: 10px;
+padding: 6px 12px;
+background: transparent;
+color: #91a9c7;
+border: 1px solid #293d56;
+border-radius: 6px;
+cursor: pointer;
+}

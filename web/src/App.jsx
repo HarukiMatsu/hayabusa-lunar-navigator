@@ -1,7 +1,8 @@
 import {useEffect, useState} from 'react'
 import './App.css'
 import visibilityUrl from '../data/visibility.json?url'
-import {missionRange, series, summarise} from './model.js'
+import {checkMission, DEFAULT_LANDER, DEFAULT_REQUIREMENTS, missionRange, series, summarise} from './model.js'
+import Verdict from './Verdict.jsx'
 import SkyView from './SkyView.jsx'
 import Timeline from './Timeline.jsx'
 import Countdown from './Countdown.jsx'
@@ -65,6 +66,12 @@ const landingMs = data
 const landingIso = data ? new Date(landingMs).toISOString() : ''
 const range = data ? missionRange(data.meta, landingIso, missionDuration) : null
 const summary = site && range ? summarise(site, range, data.meta.step_hours, mastHeight) : null
+
+// Requirements for the verdict, shared with the compare cards and the calendar.
+const [requirements, setRequirements] = useState(DEFAULT_REQUIREMENTS)
+const verdict = site && range
+? checkMission(site, range, requirements, DEFAULT_LANDER, data.meta.step_hours, mastHeight)
+: null
 
 // Selected moment within the mission, as hours after landing. Shared by the
 // sky view, timeline and countdown. Play steps one hour every 60 ms.
@@ -206,13 +213,15 @@ onChange={(event) => setSelectedMastHeight(event.target.value)
 <section className="verdict">
 <div className="section-heading">
 <h2>Mission Verdict</h2>
-<span className="verdict-status">Awaiting Analysis</span>
+<span className={`verdict-status ${verdict ? (verdict.pass ? 'status-pass' : 'status-fail') : ''}`}>
+{verdict ? (verdict.pass ? 'Pass' : 'Fail') : 'Awaiting Analysis'}
+</span>
 </div>
-<h3>Ready to compare</h3>
-<p>
-Select your landing site and mission settings, then click 
-Compare to evaluate the conditions
-</p>
+{verdict ? (
+<Verdict result={verdict} req={requirements} onReqChange={setRequirements} site={site} />
+) : (
+<p>Loading data</p>
+)}
 </section>
 
 <section className="metrics">
