@@ -4,6 +4,7 @@ import visibilityUrl from '../data/visibility.json?url'
 import {missionRange, series, summarise} from './model.js'
 import SkyView from './SkyView.jsx'
 import Timeline from './Timeline.jsx'
+import Countdown from './Countdown.jsx'
 
 function formatPct(share) {
 return `${(100 * share).toFixed(1)}%`
@@ -243,6 +244,21 @@ Compare to evaluate the conditions
 <span>{summary ? formatDays(summary.longestCommsGapHours) : ''}Continuous time without Earth in view</span>
 </div>
 </div>
+</section>
+
+<section className="metrics">
+<h2>Next Change</h2>
+{site && range ? (
+<Countdown
+site={site}
+mast={mastHeight}
+index={timeIndex}
+range={range}
+stepHours={data.meta.step_hours}
+startMs={dataStartMs}
+/>
+) : null}
+<p className="panel-note">From the time selected in the sky view or timeline: {timeLabel}</p>
 </section>
 </div>
 

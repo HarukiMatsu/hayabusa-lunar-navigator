@@ -537,3 +537,19 @@ border-radius: 50%;
 vertical-align: middle;
 background: rgba(242, 184, 75, 0.35);
 }
+
+/* Countdown cards and small notes under panels */
+.countdown-grid {
+grid-template-columns: repeat(2, 1fr);
+}
+.panel-note {
+margin: 12px 0 0;
+color: #91a9c7;
+font-size: 11px;
+line-height: 1.4;
+}
+@media (max-width: 600px) {
+.countdown-grid {
+grid-template-columns: 1fr;
+}
+}
