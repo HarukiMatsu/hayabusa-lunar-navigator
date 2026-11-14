@@ -33,7 +33,7 @@ X
 
 </div>
 
-<div className="tobbar-information">
+<div className="topbar-information">
 
 <div className="system-status">
 System Ready
@@ -65,7 +65,7 @@ value={missionDuration}
 onChange={(event) => setSelectedMissionDuration(Number(event.target.value))
 }
 >
-<option value={1}>1 Days</option>
+<option value={1}>1 Day</option>
 <option value={7}>7 Days</option>
 <option value={14}>14 Days</option>
 <option value={28}>28 Days</option>
@@ -101,7 +101,7 @@ onChange={(event) => setSelectedMastHeight(Number(event.target.value))
 <section className="verdict">
 <div className="section-heading">
 <h2>Mission Verdict</h2>
-<span className="verdict-status">Awating Analysis</span>
+<span className="verdict-status">Awaiting Analysis</span>
 </div>
 <h3>Ready to compare</h3>
 <p>
@@ -113,17 +113,18 @@ Compare to evaluate the conditions
 <section className="metrics">
 <h2>Mission Metrics</h2>
 <div className="metrics-grid">
+<div className="metric-card">
 <p>Sunlit Time</p>
 <h3>--%</h3>
 <span>Of mission duration</span>
 </div>
-<div classNam="metric-card">
+<div className="metric-card">
 <p>Longest Darkness</p>
 <h3>-- hrs</h3>
-<span>Continuous time without sunglight</span>
-
+<span>Continuous time without sunlight</span>
+</div>
 <div className="metric-card">
-<p>Earths visiblity</p>
+<p>Earth Visibility</p>
 <h3>--%</h3>
 <span>Of mission duration</span>
 </div>
@@ -140,7 +141,7 @@ Compare to evaluate the conditions
 <div className="sky-display">
 <div className="sky-object sun"> </div>
 <div className="sky-object earth"> </div>
-<div className="horizion"></div>
+<div className="horizon"></div>
 <div className="lunar-ground"></div>
 </div>
 
