@@ -133,7 +133,24 @@ Compare to evaluate the conditions
 
 <div className="right-column">
 <section className="sky-view">
+<div className="section-heading">
 <h2>Sky View</h2>
+<span className="verdict-status">Simulated View</span>
+</div>
+<div className="sky-display">
+<div className="sky-object sun"> </div>
+<div className="sky-object earth"> </div>
+<div className="horizion"></div>
+<div className="lunar-ground"></div>
+</div>
+
+<div className="sky-legend">
+<span>Sun</span>
+    <span>Earth</span>
+    <span>— Lunar horizon</span>
+</div>
+
+
 </section>
 
 <section className="timeline">
