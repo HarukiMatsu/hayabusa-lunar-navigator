@@ -12,7 +12,7 @@ import numpy as np
 from pipeline import ephemeris as eph
 from pipeline import horizon as hz
 from pipeline import visibility as vis
-from pipeline.terrain import site_dem
+from pipeline.terrain import mosaic_dem, polar_dem, site_dem
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "web" / "data" / "visibility.json"
@@ -22,6 +22,16 @@ STEP_HOURS = 1
 N_STEPS = 8760  # 365 days
 
 MASTS = (1.0, 5.0)
+
+
+def far_tiers():
+    """Far field beyond each site map, nearest first:
+    1. the 87-90 S mosaic at 80 m (40 m gave the same numbers to 0.1 point),
+       sampled every 40 m out to its edge (about 74 to 126 km from Site01);
+    2. LOLA LDEM_75S_240M, sampled every 120 m from the mosaic edge to 300 km.
+       From a 5.2 km summit a 7 km peak drops below the smooth sphere edge
+       by about 290 km, so nothing beyond 300 km can set a horizon."""
+    return [(mosaic_dem(16), 40.0, 150000.0), (polar_dem(), 120.0, 300000.0)]
 
 # Each site is a single point on its PGDA map, given in map metres.
 # Site01: centroid of Barker et al. (2021) Site 1 region of interest 1.
@@ -45,7 +55,7 @@ def build_site(site, ets, sun_km, earth_km):
     dem = site_dem(site["dem"])
     x, y = site["x"], site["y"]
     lat, lon = dem.latlon(x, y)
-    ground, hor = hz.horizon(dem, x, y, masts_m=MASTS)
+    ground, hor = hz.site_horizon(dem, x, y, masts_m=MASTS, far=far_tiers())
     slope, facing = dem.slope(x, y)
     sky = eph.site_sky(lat, lon, ground + MASTS[0], ets, sun_km, earth_km)
 

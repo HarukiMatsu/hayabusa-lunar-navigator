@@ -85,7 +85,7 @@ def check_horizon_synthetic():
     dem = Dem(z, xs[0] - res / 2, ys[0] + res / 2, res, crs.to_wkt())
 
     mast = 1.0
-    _, out = hz.horizon(dem, xc, yc, masts_m=(mast,))
+    _, out = hz.site_horizon(dem, xc, yc, masts_m=(mast,))
     h = out[mast]
     R = 1737400.0
 
@@ -113,7 +113,7 @@ def check_horizon_site01(plot=True):
     dem = site_dem("Site01")
     x, y = dem.xy(s["lat"], s["lon"])
     t = time.perf_counter()
-    ground, out = hz.horizon(dem, x, y, masts_m=(1.0, 5.0))
+    ground, out = hz.site_horizon(dem, x, y, masts_m=(1.0, 5.0))
     dt = time.perf_counter() - t
     print(f"Site01 high point: map x {x:.1f} m, y {y:.1f} m, ground {ground:.1f} m "
           f"(listed 1959.5 m); 720 rays, 5 m steps, {dt:.2f} s\n")
@@ -216,7 +216,7 @@ def check_practice():
     s = SITE01_HIGH
     dem = site_dem("Site01")
     x, y = dem.xy(s["lat"], s["lon"])
-    ground, hor = hz.horizon(dem, x, y, masts_m=(1.0, 5.0))
+    ground, hor = hz.site_horizon(dem, x, y, masts_m=(1.0, 5.0))
     n = (np.datetime64("2026-01-01") - np.datetime64("2024-01-01")).astype(int) * 24
     ets = eph.hourly_ets("2024-01-01T00:00:00Z", n)
     sky = eph.site_sky(s["lat"], s["lon"], ground + 1.0, ets)
@@ -232,6 +232,63 @@ def check_practice():
         print(f"{'':5} {'practice':9} {p[0]:9.1f} {p[1]:9.2f} {p[2]:10.1f} {p[3]:8.1f}")
 
 
+def check_farfield(site_xy=(-11582.5, -12462.5), year_start="2027-01-01T00:00:00Z", n=8760):
+    """How much each far field tier changes the Site01 RoI 1 numbers, and
+    which tier sets the horizon in each direction."""
+    from pipeline import horizon as hz
+    from pipeline import visibility as vis
+    from pipeline.build import far_tiers
+    from pipeline.terrain import site_dem, mosaic_dem
+
+    dem = site_dem("Site01")
+    x, y = site_xy
+    lat, lon = dem.latlon(x, y)
+
+    # Do the mosaic and the site map agree on height? (same datum)
+    m80 = mosaic_dem(16)
+    rng = np.random.default_rng(2)
+    px = rng.uniform(dem.x_ul + 200, dem.x_ul + dem.shape[1] * dem.res - 200, 4000)
+    py = rng.uniform(dem.y_ul - dem.shape[0] * dem.res + 200, dem.y_ul - 200, 4000)
+    dz = m80.height(px, py) - dem.height(px, py)
+    dz = dz[np.isfinite(dz)]
+    print(f"Datum check, 4000 points in the Site01 tile: mosaic (80 m) minus site map: "
+          f"median {np.median(dz):+.1f} m, middle 90% {np.percentile(dz, 5):+.0f} to {np.percentile(dz, 95):+.0f} m\n")
+
+    full = far_tiers()                      # mosaic 80 m, then polar 240 m
+    malapert = (site_dem("Site23"), 20.0, 175000.0, 100000.0)
+    cases = {
+        "A tile only": ([], ["tile"]),
+        "B + mosaic": (full[:1], ["tile", "mosaic"]),
+        "C + mosaic + polar 240m": (full, ["tile", "mosaic", "polar"]),
+        "D as C, Site23 5m first": ([full[0], malapert, full[1]], ["tile", "mosaic", "Site23", "polar"]),
+    }
+    ets = eph.hourly_ets(year_start, n)
+    hor, src = {}, {}
+    ground = None
+    for name, (far, _) in cases.items():
+        ground, hor[name], src[name] = hz.site_horizon(dem, x, y, (1.0, 5.0), far, with_source=True)
+    sky = eph.site_sky(lat, lon, ground + 1.0, ets)
+
+    earth_az = (hz.AZ >= 129) & (hz.AZ <= 145)
+    print(f"Site01 RoI 1 centroid, ground {ground:.1f} m. Horizon change vs tile only (deg), "
+          f"and how many of the 720 azimuths each tier sets:")
+    for name, (_, labels) in cases.items():
+        for m in (1.0, 5.0):
+            rise = hor[name][m] - hor["A tile only"][m]
+            counts = ", ".join(f"{lab} {np.sum(src[name][m] == k)}" for k, lab in enumerate(labels))
+            print(f"  {name:24} {m:.0f}m  mean rise {rise.mean():5.2f}, max {rise.max():5.2f}, "
+                  f"Earth dirs {rise[earth_az].mean():5.2f} | {counts}")
+
+    print(f"\n2027, hourly:                    {'sunlit %':>9} {'dark d':>7} {'Earth %':>8} {'blackout d':>11} {'both %':>7}")
+    for name in cases:
+        for m in (1.0, 5.0):
+            st = vis.summary(vis.disc_fraction(hor[name][m], sky["sun_az"], sky["sun_el"], sky["sun_rad"]),
+                             vis.disc_fraction(hor[name][m], sky["earth_az"], sky["earth_el"], sky["earth_rad"]))
+            print(f"  {name:24} {m:.0f}m {st['sunlit_pct']:9.1f} {st['longest_dark_h'] / 24:7.1f} "
+                  f"{st['earth_pct']:8.1f} {st['longest_blackout_h'] / 24:11.1f} {st['both_pct']:7.1f}")
+    return hor, src
+
+
 CHECKS = {
     "horizons": check_horizons,
     "horizon-synthetic": check_horizon_synthetic,
@@ -239,6 +296,7 @@ CHECKS = {
     "disc": check_disc,
     "slope": check_slope,
     "practice": check_practice,
+    "farfield": check_farfield,
 }
 
 if __name__ == "__main__":

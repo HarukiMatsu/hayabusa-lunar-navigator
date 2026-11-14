@@ -72,9 +72,11 @@ Sun angular radius $\rho \approx 0.27^\circ$. With $\Delta = \text{el}_\odot - \
 
 $$f_\odot = \frac12 + \frac{x\sqrt{1-x^2} + \arcsin x}{\pi}$$
 
-### Visibility
-- Sun **lit** when $f_\odot \ge 0.5$.
-- Earth **visible** when $\text{el}_\oplus - \theta_{\mathrm{hor}}(\text{az}_\oplus) > m$, comms margin $m$ default 0°.
+### Visibility (agreed 14 Nov)
+- **Sunlit %** is the average visible fraction, $\overline{f_\odot}$, with no threshold. This is the same quantity as Barker et al.'s "average illumination".
+- **Yes/no states** use half the disc: the Sun is **lit** when $f_\odot \ge 0.5$, and Earth is **visible** when $f_\oplus \ge 0.5$ (the disc centre is above the terrain). With a comms margin $m$ (default 0°), Earth is visible when $\text{el}_\oplus - \theta_{\mathrm{hor}}(\text{az}_\oplus) > m$. Timeline bars, longest darkness, time to sunset, Earth visible %, longest blackout and both % all use these.
+- **None/any** ($f_\odot = 0$ and $f_\odot > 0$) are used only in `pipeline/validate.py`, to compare with Barker's LCSP (no part of the Sun visible) and LCIP (any part visible).
+- The pipeline computes $f$ by slicing the disc into 64 vertical strips with the horizon at each strip's azimuth (`pipeline/visibility.py`); on a flat horizon this equals the formula above.
 
 ---
 
@@ -82,7 +84,7 @@ $$f_\odot = \frac12 + \frac{x\sqrt{1-x^2} + \arcsin x}{\pi}$$
 
 | Metric | Definition |
 |---|---|
-| Sunlit % | mean of $f_\odot$ over the window |
+| Sunlit % | mean of $f_\odot$ over the window (no threshold; same as Barker's "average illumination"; web app computes `mean(sun)`) |
 | Longest darkness | longest run of consecutive not lit hours |
 | Earth visible % | fraction of hours Earth is visible |
 | Longest blackout | longest run of hours Earth is not visible |
@@ -106,7 +108,7 @@ Heavy work offline in Python. The web app is static and only does light maths, s
 3. **Single horizons** for Apollo and other non polar sites: limb only (flat) horizon, clearly labelled. Equatorial horizons barely matter.
 4. **Outside any tile:** limb only horizon with an on screen warning.
 5. **Frontend:** plain JS (or React if the frontend person prefers). Canvas or D3 for the sky view and timeline, Leaflet for the tile map. All metrics computed in the browser.
-6. **Hosting:** static (GitHub Pages or Netlify). Public repo, Apache 2.0 licence.
+6. **Hosting:** static (GitHub Pages or Netlify). Public repo, MIT licence (the LICENSE file in the GitHub repo).
 
 ### Repo layout
 ```
@@ -354,6 +356,12 @@ Record anything learned (conventions, gotchas, timings) in section 12 below so S
 - Site01 entry uses the Barker RoI 1 centroid (x -11582.5, y -12462.5). 2027, tile only: 1 m sunlit 83.7%, longest dark 12.5 d, Earth 57.1%, both 48.3%; 5 m sunlit 94.7%, longest dark 4.5 d, Earth 62.6%, both 60.6%. File is 0.41 MB per site.
 - Rounded azimuths can hit 360.00; `build.py` wraps them to [0, 360).
 - Step 4 instructions from Haruki: do not clamp horizons at the sphere dip; use real mosaic heights (terrain can lie below the reference radius). Check whether terrain beyond the mosaic edge (north of 87 S) can set the horizon, e.g. Malapert massif (about 5 km high, about 130 km away, near the Earth direction). If so, propose the LOLA 240 m polar DEM (75 to 90 S) as a third tier and report before downloading anything.
+- Lit threshold (14 Nov; agreed definitions now in section 2, Visibility). Barker et al. (2021): average illumination = mean visible fraction of the Sun's disc (no threshold, with limb darkening, disc cut flat at the horizon height at the disc centre azimuth); LCSP = longest run with no part of the Sun visible ($f=0$); LCIP = longest run with any part visible ($f>0$). Standard for us: sunlit % = mean of $f_\odot$; lit/dark state for timeline bars, longest darkness, time to sunset and both % uses $f_\odot \ge 0.5$; validation against Barker uses $f=0$ and $f>0$. At Site01 2027 the two sunlit definitions differ by 0.1 point; longest dark differs by 0.6 to 0.7 d.
+- Mosaic: data only out to about 87 S, so rays from Site01 leave it 74 to 126 km away (112 to 114 km in Earth's directions). The Site23 tile (y 111 to 132 km) lies entirely outside the mosaic. Mosaic minus Site01 tile height: median -0.2 m, so same datum.
+- Step 4 (14 Nov, `python -m pipeline.validate farfield`, Site01 RoI 1 centroid, 2027). Adding the 80 m mosaic: 1 m sunlit 83.7 to 82.6%, Earth 57.1 to 57.0%; 5 m sunlit 94.7 to 93.2%, Earth 62.6 to 58.3%, both 60.6 to 56.1%. 40 m mosaic gives the same to 0.1 point, so 80 m is used. Adding the Site23 tile beyond the mosaic edge: Malapert sets the 1 m horizon in 20 directions around Earth (highest -0.86 deg at az 144), Earth visible falls a further 4 points (57.0 to 53.1% at 1 m, 58.3 to 53.1% at 5 m), sunlit about 1 point. So terrain beyond 87 S matters for comms; proposed third tier `ldem_75s_240m.img` (29 MB, PDS Geosciences Node, LOLA GDR polar), matching Barker's 240 m beyond 100 km.
+- 240 m polar map `raw/polar/ldem_75s_240m.img` + `.lbl` (29 MB, PDS Geosciences Node, LOLA GDR polar). Label: MOON_ME of DE421, 1737.4 km sphere, polar stereographic lon_0 0, height = 0.5 * DN m. GDAL also reports offset 1737400 m: do not apply it (gives radius). Heights -7765 to 7025 m. Datum check vs mosaic (20000 points within 85 km of the pole): median +0.1 m, middle 90% -4 to +5 m; mirroring either axis gives about 1000 m, so orientation is right. Vs Site23 tile: median -0.5 m.
+- Tiers in `build.py`: site tile (5 m steps) to its edge, mosaic 80 m (40 m steps) to its edge, polar 240 m (120 m steps) from there to 300 km. A 7 km peak drops below the smooth sphere edge seen from 5.2 km height at about 290 km, so 300 km is enough for every site.
+- Step 4 final (Site01 RoI 1 centroid, 2027). Azimuths set, 1 m: tile 472, mosaic 154, polar 94; 5 m: tile 265, mosaic 293, polar 162. Numbers, 1 m: sunlit 81.3%, longest dark 13.8 d, Earth 51.1%, blackout 13.3 d, both 43.2%. 5 m: 91.6%, 4.8 d, 51.2%, 13.3 d, 49.7%. Using the 5 m Site23 tile before the polar map changes nothing (within 0.1), so 240 m resolves Malapert well enough. Terrain beyond the mosaic cuts Site01 Earth visibility by 6 to 7 points.
 - (add more here)
 
 ---

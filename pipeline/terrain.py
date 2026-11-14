@@ -124,3 +124,33 @@ class Dem:
 
 def site_dem(site):
     return Dem.open(site_dem_path(site))
+
+
+POLAR_240 = ROOT / "raw" / "polar" / "ldem_75s_240m.lbl"
+_polar_cache = []
+
+
+def polar_dem():
+    """LOLA LDEM_75S_240M (75-90 S, 240 m, MOON_ME of DE421). Stored as int16
+    DN with height = 0.5 * DN metres above the 1737.4 km sphere. GDAL also
+    reports an offset of 1737400 m; that would give radius, so it is not
+    applied."""
+    if not _polar_cache:
+        with rasterio.open(POLAR_240) as src:
+            dn = src.read(1)
+            t = src.transform
+            z = np.where(dn == src.nodata, np.nan, dn.astype(np.float32) * 0.5)
+            _polar_cache.append(Dem(z, t.c, t.f, t.a, src.crs.to_wkt()))
+    return _polar_cache[0]
+
+
+_mosaic_cache = {}
+
+
+def mosaic_dem(factor=16):
+    """The 87-90 S mosaic at a reduced resolution, read from the file's built in
+    overviews: factor 2, 4, 8 or 16 gives 10, 20, 40 or 80 m pixels."""
+    if factor not in _mosaic_cache:
+        level = {2: 0, 4: 1, 8: 2, 16: 3}[factor]
+        _mosaic_cache[factor] = Dem.open(MOSAIC, overview_level=level)
+    return _mosaic_cache[factor]
