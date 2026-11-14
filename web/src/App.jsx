@@ -3,6 +3,7 @@ import './App.css'
 import visibilityUrl from '../data/visibility.json?url'
 import {checkMission, DEFAULT_LANDER, DEFAULT_REQUIREMENTS, missionRange, series, summarise} from './model.js'
 import Verdict from './Verdict.jsx'
+import Compare from './Compare.jsx'
 import SkyView from './SkyView.jsx'
 import Timeline from './Timeline.jsx'
 import Countdown from './Countdown.jsx'
@@ -103,14 +104,14 @@ if (!playing && offset >= windowHours - 1) setTimeOffset(0)
 setPlaying(!playing)
 }
 
+// Saved scenarios for side-by-side comparison (at most MAX_SCENARIOS).
+const MAX_SCENARIOS = 4
+const [scenarios, setScenarios] = useState([])
 const handleCompare = () => {
-console.log("Comparing mission settings:", {
-selectedSite,
-landingIso,
-missionDuration,
-mastHeight,
-range
-})
+if (!data || scenarios.length >= MAX_SCENARIOS) return
+const key = `${selectedSite}|${landingIso}|${missionDuration}|${mastHeight}`
+if (scenarios.some((sc) => sc.key === key)) return
+setScenarios([...scenarios, {key, siteId: selectedSite, landingIso, missionDays: missionDuration, mast: mastHeight}])
 }
 
 return (
@@ -201,8 +202,10 @@ onChange={(event) => setSelectedMastHeight(event.target.value)
 <option value="5m">5 m</option>
 </select>
 </div>
-<button className="compare-button" onClick={handleCompare}>
-+ Compare
+<button className="compare-button" onClick={handleCompare}
+disabled={!data || scenarios.length >= MAX_SCENARIOS}
+title={scenarios.length >= MAX_SCENARIOS ? `Up to ${MAX_SCENARIOS} scenarios; remove one to add another` : 'Add these settings to the comparison'}>
++ Compare{scenarios.length ? ` (${scenarios.length}/${MAX_SCENARIOS})` : ''}
 </button>
 </div>
 
@@ -331,8 +334,24 @@ setTimeOffset(i - range.from)
 </div>
 </section>
 
-</div> 
 </div>
+</div>
+
+<section className="compare-section">
+<div className="section-heading">
+<h2>Compare Scenarios</h2>
+<span className="verdict-status">Same requirements for every card</span>
+</div>
+{data ? (
+<Compare
+data={data}
+scenarios={scenarios}
+req={requirements}
+max={MAX_SCENARIOS}
+onRemove={(key) => setScenarios(scenarios.filter((sc) => sc.key !== key))}
+/>
+) : null}
+</section>
 
 </main>
 
