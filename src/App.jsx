@@ -3,10 +3,18 @@ import './App.css'
 
 function App() {
 
-const [selectedSite, setSelectedSite] = useState('Shacklton Crater')
+const [selectedSite, setSelectedSite] = useState('Shackleton Crater')
 const [selectedDate, setSelectedDate] = useState('')
-const [missionDuration, setSelectedMissionDuration] = useState(7)
+const [missionDuration, setSelectedMissionDuration] = useState(14)
 const [mastHeight, setSelectedMastHeight] = useState(2)
+const handleCompare = () => {
+console.log("Comparing mission settings:", {
+selectedSite,
+selectedDate,
+missionDuration,
+mastHeight
+})
+}
 
 return (
 <main className="dashboard">
@@ -36,16 +44,70 @@ System Ready
 
 
 </header>
+<div className="mission-toolbar">
+<div className="toolbar-control">
+<label htmlFor="landing-site">Site:</label>
+<select
+id = "landing-site"
+value={selectedSite}
+onChange={(event) => setSelectedSite(event.target.value)}
+>
+<option value="Shackleton Crater">Shackleton Crater</option>
+<option value="de Gerlache Crater">de Gerlache Crater</option>
+<option value="Connecting Ridge">Connecting Ridge</option>
+</select>
+</div>
+<div className="toolbar-control">
+<label htmlFor="mission-duration">Mission Duration (days):</label>
+<select
+id="mission-duration"
+value={missionDuration}
+onChange={(event) => setSelectedMissionDuration(Number(event.target.value))
+}
+>
+<option value={1}>1 Days</option>
+<option value={7}>7 Days</option>
+<option value={14}>14 Days</option>
+<option value={28}>28 Days</option>
+<option value={30}>30 Days</option>
+</select>
+</div>
+
+<div className="toolbar-control">
+<label htmlFor="mast-height">Mast Height (meters):</label>
+<select 
+id="mast-height"
+value={mastHeight}
+onChange={(event) => setSelectedMastHeight(Number(event.target.value))
+}
+>
+<option value={1}>1 m</option>
+<option value={2}>2 m</option>
+<option value={3}>3 m</option>
+<option value={4}>4 m</option>
+<option value={5}>5 m</option>
+<option value={10}>10 m</option>
+</select>
+</div>
+<button className="compare-button" onClick={handleCompare}>
++ Compare
+</button>
+</div>
 
 <div className="dashboard-layout">
 
 <div className="left-column">
-<section className="configuration">
-<h2>Mission Configuration</h2>
-</section>
 
 <section className="verdict">
+<div className="section-heading">
 <h2>Mission Verdict</h2>
+<span className="verdict-status">Awating Analysis</span>
+</div>
+<h3>Ready to compare</h3>
+<p>
+Select your landing site and mission settings, then click 
+Compare to evaluate the conditions
+</p>
 </section>
 
 <section className="metrics">
