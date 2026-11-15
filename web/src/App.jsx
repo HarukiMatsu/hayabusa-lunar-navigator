@@ -9,6 +9,7 @@ import Calendar from './Calendar.jsx'
 import SkyView, {Closeups} from './SkyView.jsx'
 import Timeline from './Timeline.jsx'
 import Countdown from './Countdown.jsx'
+import SouthPoleMap from './SouthPoleMap.jsx'
 
 function formatPct(share) {
 return `${(100 * share).toFixed(1)}`
