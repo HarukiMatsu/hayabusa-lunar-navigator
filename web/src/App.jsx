@@ -139,7 +139,10 @@ return (
 </p>
 </header>
 
+
+
 <section className="sky-block" aria-labelledby="sky-title">
+
 <div className="block-heading">
 <h2 id="sky-title">Sky from {site ? site.name : 'the site'}</h2>
 <p className="note">Terrain horizon for a {mastHeight === '5m' ? '5 m' : '1 m'} mast, from LOLA elevation maps.</p>
@@ -190,6 +193,7 @@ startMs={dataStartMs}
 ) : (
 <div className="sky-placeholder" />
 )}
+
 </section>
 
 <div className="lower">
@@ -212,6 +216,11 @@ disabled={!data}
 {formatLatLon(site.lat, site.lon)}. Fixed points only: horizons are computed in advance from terrain maps, so custom coordinates are not available.
 </p>
 )}
+<SouthPoleMap
+sites={data ? data.sites : []}
+selectedSite={selectedSite}
+onSelect={setSelectedSite}
+/>
 <label className="field">
 <span>Landing time (UTC)</span>
 <input

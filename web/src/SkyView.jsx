@@ -95,6 +95,7 @@ export default function SkyView({site, mast, range, index}) {
       <svg className="sky-svg" viewBox={`0 0 ${W} ${H}`} role="img"
         aria-label={`Panorama of the terrain horizon. The Sun is ${sunUp ? 'in view' : 'hidden'} and Earth is ${earthUp ? 'in view' : 'hidden'}.`}>
         <rect x="0" y="0" width={W} height={H} className="sky-fill" />
+
         {elTicks.map((e) => (
           <g key={`e${e}`}>
             <line x1={L} x2={W - R} y1={y(e)} y2={y(e)} className={e === 0 ? 'sky-grid zero' : 'sky-grid'} />
