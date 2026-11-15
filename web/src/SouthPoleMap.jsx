@@ -1,3 +1,4 @@
+import lunarSurface from './assets/moon.jpeg'
 function SouthPoleMap({sites, selectedSite, onSelect}) {
 return (
 <section className="south-pole-map">
@@ -10,11 +11,25 @@ height="260"
 role="img"
 aria-label="Map of Lunar Sout Pole landing sites"
 >
+<defs>
+<clipPath id="moonClip" clipPath="userSpaceOnUse">
+<circle cx="130" cy="130" r="116"/>
+</clipPath>
+</defs>
+
+<image clipPath="url (#moonClip)"
+href={lunarSurface}
+x="0"
+y="0"
+width="260"
+height="260"
+preserveAspectRatio="xMidYMid slice"
+/>
 <circle
 cx = "130"
 cy = "130"
 r = "116"
-fill = "#111820"
+fill = "none"
 stroke = "#82909d"
 strokeWidth = "1.5"
 />
