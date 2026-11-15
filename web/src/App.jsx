@@ -128,12 +128,45 @@ const key = `${selectedSite}|${landingIso}|${missionDuration}|${mastHeight}`
 if (scenarios.some((sc) => sc.key === key)) return
 setScenarios([...scenarios, {key, siteId: selectedSite, landingIso, missionDays: missionDuration, mast: mastHeight}])
 }
+const handleTryExample = () => {
+const siteId = "site04_roi3"
+
+setSelectedSite(siteId)
+setSelectedMastHeight("")
+setScenarios([
+{
+key: `${siteId}|${landingIso}|${missionDuration}|`,
+siteId,
+landingIso,
+missionDays: missionDuration,
+mast: '',
+},
+{
+key: `${siteId}|${landingIso}|${missionDuration}|5m`,
+siteId,
+landingIso,
+missionDays: missionDuration,
+mast: '5m',
+}
+])
+
+}
 
 return (
 <main className="dashboard">
 
 <header className="topbar">
 <h1>Hayabusa lunar navigator</h1>
+<p>Explore lunar South Pole landing sites and compare sunlight, Earth visibility and landing conditions.
+</p>
+<button
+type="button"
+className="button"
+onClick={handleTryExample}
+disabled={!data}
+>
+Try this example
+</button>
 <p className="status" role="status">
 {loadError ? `Data failed to load: ${loadError}` : data ? `${data.sites.length} sites loaded. Sun ${lit ? 'in view' : 'hidden'} at the selected hour.` : 'Loading data'}
 </p>
@@ -269,11 +302,11 @@ Add to comparison ({scenarios.length} of {MAX_SCENARIOS})
 <h2 id="metrics-title">Mission metrics</h2>
 {summary ? (
 <dl className="metrics">
-<Metric value={formatPct(summary.sunShare)} unit="%" label="Sunlit, average share of the Sun's disc" />
+<Metric value={formatPct(summary.sunShare)} unit="%" label="Average visible share of the Sun's disc" />
 <Metric value={formatPct(summary.earthShare)} unit="%" label="Earth in view" />
-<Metric value={formatPct(summary.bothShare)} unit="%" label="Sun and Earth together" />
+<Metric value={formatPct(summary.bothShare)} unit="%" label="Sun and Earth visible together" />
 <Metric value={summary.longestDarkHours} unit="h" label={`Longest darkness, ${(summary.longestDarkHours / 24).toFixed(1)} days`} />
-<Metric value={summary.longestCommsGapHours} unit="h" label={`Longest comms gap, ${(summary.longestCommsGapHours / 24).toFixed(1)} days`} />
+<Metric value={summary.longestCommsGapHours} unit="h" label={`Longest communication gap, ${(summary.longestCommsGapHours / 24).toFixed(1)} days`} />
 </dl>
 ) : (
 <p className="note">Loading data</p>

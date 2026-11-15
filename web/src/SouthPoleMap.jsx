@@ -9,7 +9,7 @@ viewBox="0 0 260 260"
 width="260"
 height="260"
 role="img"
-aria-label="Map of Lunar Sout Pole landing sites"
+aria-label="Map of Lunar South Pole landing sites"
 >
 <defs>
 <clipPath id="moonClip" clipPath="userSpaceOnUse">
@@ -17,7 +17,7 @@ aria-label="Map of Lunar Sout Pole landing sites"
 </clipPath>
 </defs>
 
-<image clipPath="url (#moonClip)"
+<image clipPath="url(#moonClip)"
 href={lunarSurface}
 x="0"
 y="0"
@@ -65,17 +65,27 @@ const offsets = [
 
 const[offsetX, offsetY] = offsets[index]
 return (
+<g key={site.id}
+onClick={() => onSelect(site.id)}
+style={{cursor: "pointer"}}
+>
 <circle
-key={site.id}
 cx={x + offsetX}
 cy={y + offsetY}
 r="5"
 fill={site.id === selectedSite ? "#ffd23f" : "#5b93f0"}
 stroke="white"
-strokeWidth="1"
-onClick={() => onSelect(site.id)}
-style={{ cursor: "pointer"}}
+strokedWidth="1"
 />
+<text
+x={x + offsetX + 8}
+y={y + offsetY - 8}
+fill="white"
+fontSize="7"
+>
+{site.name}
+</text>
+</g>
 )
 
 })}

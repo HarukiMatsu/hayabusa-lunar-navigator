@@ -18,7 +18,7 @@ export default function Compare({data, scenarios, req, max, onRemove}) {
           <article key={sc.key} className="scenario">
             <h3>{site.name}</h3>
             <p className="note">
-              {sc.landingIso.slice(0, 16).replace('T', ' ')} UTC, {sc.missionDays} {sc.missionDays === 1 ? 'day' : 'days'}, {sc.mast === '5m' ? '5 m' : '1 m'} mast
+             Landing: {sc.landingIso.slice(0, 16).replace('T', ' ')} UTC, {sc.missionDays} {sc.missionDays === 1 ? 'day' : 'days'}, {sc.mast === '5m' ? '5 m' : '1 m'} mast
             </p>
             <p className="scenario-result">
               <span className={result.pass ? 'word-pass' : 'word-fail'}>{result.pass ? 'Pass' : 'Fail'}</span>
