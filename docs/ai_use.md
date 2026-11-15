@@ -50,3 +50,5 @@ Used ChatGPT to learn and understand React, JavaScript, JSX and SVG concepts dur
 Received assistance with checking the development environment by running node -v and npm -v in the terminal to verify the installed Node.js and npm versions.
 
 Used ChatGPT to find a downloadable Moon surface JPEG image, which was subsequently used as the background for the lunar South Pole map.
+
+Update, 15 Nov 2026: the Moon image was removed because its source could not be confirmed. The South Pole map is now drawn as SVG from the site coordinates.
