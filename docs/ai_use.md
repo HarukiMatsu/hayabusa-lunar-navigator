@@ -24,3 +24,28 @@ Running log of how Claude Code (Anthropic) was used on this project.
 | 14 Nov 2026 | Frontend panels 6 to 9 on `integration` | Panel 6: countdown to the next sunset/sunrise and Earthset/Earthrise from `hoursUntilChange()`; panel 7: verdict from `checkMission()` with editable requirements, each check shown, cold reported from `thermalSummary()`; panel 8: up to four scenario cards side by side; panel 9: landing calendar from `landingCalendar()` (about 4 ms per site for a 14-day mission in Node). Each checked against `model.js` in Node and with headless browser screenshots |
 | 14 Nov 2026 | Restyle the frontend on `integration` | New layout (full-width sky view with the timeline on the same time axis, settings column, metrics as large numerals, verdict checklist, calendar, compare), two themes switched by whether the Sun is up at the selected hour, Archivo type, pass and fail as words and tall/short calendar bars. Checked contrast for every colour pair in both themes (fixed three low pairs), and reviewed screenshots of a lit and a shadowed hour at 1280 px and 390 px. `model.js` unchanged |
 | 14 Nov 2026 | Self-host the font and set up publishing to GitHub Pages | Archivo variable font (latin and latin-ext, with its OFL licence) in `web/public/fonts/`, Google Fonts link removed; repo base path in `web/vite.config.js`; GitHub Actions workflow `.github/workflows/deploy-pages.yml` that builds `web/` and publishes it from `main`; README section on running the app. Checked the built site under the base path with a local preview |
+
+
+## Joshua – ChatGPT Usage
+
+Before the Competition
+
+Used ChatGPT to develop an understanding of the team's project, the Lunar Landing Site Navigator, including its purpose, functionality and how it works.
+
+Used ChatGPT to break down the project brief provided by the team owner, understand the project requirements and identify ways to prepare for the competition while adhering to the competition rules.
+
+During the Competition – Technical and Development Assistance
+
+Received guidance on the initial setup of the React development environment through the terminal.
+
+Received assistance with retrieving moon.jpeg from GitHub and placing it in the local project assets folder in Visual Studio Code.
+
+Used ChatGPT to understand and interpret the data contained in the project's JSON file.
+
+Received guidance on identifying the correct project directory (web) in the terminal and running the project from the integration branch using npm run dev.
+
+Used ChatGPT to learn and understand React, JavaScript, JSX and SVG concepts during frontend development.
+
+Received assistance with checking the development environment by running node -v and npm -v in the terminal to verify the installed Node.js and npm versions.
+
+Used ChatGPT to find a downloadable Moon surface JPEG image, which was subsequently used as the background for the lunar South Pole map.
